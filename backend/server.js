@@ -73,3 +73,36 @@ app.get("/departments", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+app.put("/update-department/:id", (req, res) => {
+  const { dept_name, description } = req.body;
+  const dept_id = req.params.id;
+
+  const sql = `
+    UPDATE department 
+    SET dept_name = ?, description = ?, updated_at = NOW()
+    WHERE dept_id = ?
+  `;
+
+  db.query(sql, [dept_name, description, dept_id], (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send("Error updating department");
+    } else {
+      res.send("Department updated successfully");
+    }
+  });
+});
+app.delete("/delete-department/:id", (req, res) => {
+  const id = req.params.id;
+
+  const sql = "UPDATE department SET status = FALSE WHERE dept_id=?";
+
+  db.query(sql, [id], (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send("Error deleting department");
+    } else {
+      res.send("Department deleted successfully");
+    }
+  });
+});
