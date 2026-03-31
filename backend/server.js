@@ -31,10 +31,10 @@ app.get("/", (req, res) => {
   res.send("HRM Backend Server is Running");
 });
 
-/* ADD DEPARTMENT API */
+/* ================= DEPARTMENT APIs ================= */
 
+/* ADD DEPARTMENT */
 app.post("/add-department", (req, res) => {
-
   const { dept_name, description } = req.body;
 
   const sql = `
@@ -50,13 +50,10 @@ app.post("/add-department", (req, res) => {
       res.send("Department added successfully");
     }
   });
-
 });
 
-/* GET DEPARTMENTS API */
-
+/* GET DEPARTMENTS */
 app.get("/departments", (req, res) => {
-
   const sql = "SELECT * FROM department WHERE status = TRUE";
 
   db.query(sql, (err, result) => {
@@ -67,12 +64,9 @@ app.get("/departments", (req, res) => {
       res.json(result);
     }
   });
-
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+/* UPDATE DEPARTMENT */
 app.put("/update-department/:id", (req, res) => {
   const { dept_name, description } = req.body;
   const dept_id = req.params.id;
@@ -92,6 +86,8 @@ app.put("/update-department/:id", (req, res) => {
     }
   });
 });
+
+/* DELETE DEPARTMENT */
 app.delete("/delete-department/:id", (req, res) => {
   const id = req.params.id;
 
@@ -105,4 +101,49 @@ app.delete("/delete-department/:id", (req, res) => {
       res.send("Department deleted successfully");
     }
   });
+});
+
+/* ================= EMPLOYEE APIs ================= */
+
+/* ADD EMPLOYEE */
+app.post("/add-employee", (req, res) => {
+  const { emp_name, email, dept_id } = req.body;
+
+  const sql = `
+    INSERT INTO employee (emp_name, email, dept_id, created_at, updated_at, status)
+    VALUES (?, ?, ?, NOW(), NOW(), TRUE)
+  `;
+
+  db.query(sql, [emp_name, email, dept_id], (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send("Error adding employee");
+    } else {
+      res.send("Employee added successfully");
+    }
+  });
+});
+
+/* GET EMPLOYEES */
+app.get("/employees", (req, res) => {
+  const sql = `
+    SELECT e.emp_id, e.emp_name, e.email, d.dept_name
+    FROM employee e
+    JOIN department d ON e.dept_id = d.dept_id
+    WHERE e.status = TRUE
+  `;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).send("Error fetching employees");
+    } else {
+      res.json(result);
+    }
+  });
+});
+
+/* START SERVER */
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
