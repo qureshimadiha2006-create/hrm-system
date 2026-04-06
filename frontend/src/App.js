@@ -1,17 +1,44 @@
-import React from "react";
+import React, { useState } from "react";
 import Department from "./Department";
 import Employee from "./Employee";
 
 function App() {
+  const [page, setPage] = useState("department");
+
   return (
     <div>
-      <h1>HRM System</h1>
+      {/* HEADER */}
+      <div style={{
+        backgroundColor: "#282c34",
+        padding: "15px",
+        color: "white",
+        textAlign: "center"
+      }}>
+        <h1>HRM System</h1>
+      </div>
 
-      <Department />
+      {/* NAVIGATION */}
+      <div style={{ textAlign: "center", margin: "20px" }}>
+        <button
+          style={{ margin: "10px", padding: "10px 20px" }}
+          onClick={() => setPage("department")}
+        >
+          Department
+        </button>
 
-      <hr />
+        <button
+          style={{ margin: "10px", padding: "10px 20px" }}
+          onClick={() => setPage("employee")}
+        >
+          Employee
+        </button>
+      </div>
 
-      <Employee />
+      {/* CONTENT */}
+      <div>
+        {page === "department" && <Department />}
+        {page === "employee" && <Employee />}
+      </div>
     </div>
   );
 }
