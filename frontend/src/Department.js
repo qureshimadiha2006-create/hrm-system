@@ -1,63 +1,69 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 function Department() {
   const [departments, setDepartments] = useState([]);
+  const [deletedDepartments, setDeletedDepartments] = useState([]);
+
   const [dept_name, setDeptName] = useState("");
   const [description, setDescription] = useState("");
   const [editId, setEditId] = useState(null);
 
-  const BASE_URL = "http://127.0.0.1:5000";
-
   useEffect(() => {
     fetchDepartments();
+    fetchDeletedDepartments();
   }, []);
 
-  // FETCH DATA
   const fetchDepartments = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/departments`);
-      setDepartments(res.data);
-    } catch (error) {
-      console.log("FETCH ERROR:", error);
-    }
+    const res = await axios.get("http://localhost:5000/departments");
+    setDepartments(res.data);
   };
 
-  // ADD or UPDATE
+  const fetchDeletedDepartments = async () => {
+    const res = await axios.get("http://localhost:5000/deleted-departments");
+    setDeletedDepartments(res.data);
+  };
+
   const handleSubmit = async () => {
-    try {
-      if (editId) {
-        await axios.put(`${BASE_URL}/update-department/${editId}`, {
-          dept_name,
-          description,
-        });
-      } else {
-        await axios.post(`${BASE_URL}/add-department`, {
-          dept_name,
-          description,
-        });
-      }
-
-      setDeptName("");
-      setDescription("");
-      setEditId(null);
-      fetchDepartments();
-    } catch (error) {
-      console.log("SUBMIT ERROR:", error);
+    if (!dept_name || !description) {
+      alert("Fill all fields");
+      return;
     }
+
+    if (editId) {
+      await axios.put(`http://localhost:5000/update-department/${editId}`, {
+        dept_name,
+        description,
+      });
+    } else {
+      await axios.post("http://localhost:5000/add-department", {
+        dept_name,
+        description,
+      });
+    }
+
+    setDeptName("");
+    setDescription("");
+    setEditId(null);
+
+    fetchDepartments();
+    fetchDeletedDepartments();
   };
 
-  // DELETE
   const deleteDepartment = async (id) => {
-    try {
-      await axios.delete(`${BASE_URL}/delete-department/${id}`);
+    if (window.confirm("Are you sure?")) {
+      await axios.delete(`http://localhost:5000/delete-department/${id}`);
       fetchDepartments();
-    } catch (error) {
-      console.log("DELETE ERROR:", error);
+      fetchDeletedDepartments();
     }
   };
 
-  // EDIT
+  const restoreDepartment = async (id) => {
+    await axios.put(`http://localhost:5000/restore-department/${id}`);
+    fetchDepartments();
+    fetchDeletedDepartments();
+  };
+
   const editDepartment = (dept) => {
     setDeptName(dept.dept_name);
     setDescription(dept.description);
@@ -65,63 +71,78 @@ function Department() {
   };
 
   return (
-    <div style={{ width: "60%", margin: "auto", textAlign: "center" }}>
-      <h1>Department Management</h1>
-
-      <h3>{editId ? "Edit Department" : "Add Department"}</h3>
+    <div style={{ textAlign: "center" }}>
+      <h2>Department</h2>
 
       <input
-        style={{ margin: "5px", padding: "5px" }}
-        type="text"
         placeholder="Department Name"
         value={dept_name}
         onChange={(e) => setDeptName(e.target.value)}
       />
-
       <input
-        style={{ margin: "5px", padding: "5px" }}
-        type="text"
         placeholder="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
 
-      <br />
+      <br /><br />
 
-      <button onClick={handleSubmit} style={{ margin: "10px", padding: "8px" }}>
+      <button onClick={handleSubmit}>
         {editId ? "Update" : "Add"}
       </button>
 
-      <h2>Department List</h2>
+      {/* ✅ ACTIVE TABLE */}
+      <h3>Active Departments</h3>
 
-      <table border="1" cellPadding="10" style={{ margin: "auto" }}>
+      <table border="1" style={{ margin: "auto" }}>
         <thead>
           <tr>
             <th>ID</th>
-            <th>Department Name</th>
+            <th>Name</th>
             <th>Description</th>
             <th>Actions</th>
           </tr>
         </thead>
 
         <tbody>
-          {departments.map((dept) => (
-            <tr key={dept.dept_id}>
-              <td>{dept.dept_id}</td>
-              <td>{dept.dept_name}</td>
-              <td>{dept.description}</td>
+          {departments.map((d) => (
+            <tr key={d.dept_id}>
+              <td>{d.dept_id}</td>
+              <td>{d.dept_name}</td>
+              <td>{d.description}</td>
               <td>
-                <button
-                  onClick={() => editDepartment(dept)}
-                  style={{ marginRight: "5px" }}
-                >
-                  Edit
-                </button>
-
-                <button
-                  onClick={() => deleteDepartment(dept.dept_id)}
-                >
+                <button onClick={() => editDepartment(d)}>Edit</button>
+                <button onClick={() => deleteDepartment(d.dept_id)}>
                   Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* ✅ DELETED TABLE */}
+      <h3>Deleted Departments</h3>
+
+      <table border="1" style={{ margin: "auto" }}>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Restore</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {deletedDepartments.map((d) => (
+            <tr key={d.dept_id}>
+              <td>{d.dept_id}</td>
+              <td>{d.dept_name}</td>
+              <td>{d.description}</td>
+              <td>
+                <button onClick={() => restoreDepartment(d.dept_id)}>
+                  Restore
                 </button>
               </td>
             </tr>

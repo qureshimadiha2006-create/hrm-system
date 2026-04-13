@@ -1,44 +1,38 @@
 import React, { useState } from "react";
 import Department from "./Department";
 import Employee from "./Employee";
+import Login from "./Login";
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [page, setPage] = useState("department");
 
-  return (
-    <div>
-      {/* HEADER */}
-      <div style={{
-        backgroundColor: "#282c34",
-        padding: "15px",
-        color: "white",
-        textAlign: "center"
-      }}>
-        <h1>HRM System</h1>
-      </div>
+  if (!isLoggedIn) {
+    return <Login onLogin={() => setIsLoggedIn(true)} />;
+  }
 
-      {/* NAVIGATION */}
-      <div style={{ textAlign: "center", margin: "20px" }}>
-        <button
-          style={{ margin: "10px", padding: "10px 20px" }}
-          onClick={() => setPage("department")}
-        >
+  return (
+    <div style={{ textAlign: "center" }}>
+      <h1>HRM System</h1>
+
+      {/* 🔹 NAVIGATION */}
+      <div style={{ marginBottom: "20px" }}>
+        <button onClick={() => setPage("department")}>
           Department
         </button>
 
-        <button
-          style={{ margin: "10px", padding: "10px 20px" }}
-          onClick={() => setPage("employee")}
-        >
+        <button onClick={() => setPage("employee")}>
           Employee
+        </button>
+
+        <button onClick={() => setIsLoggedIn(false)}>
+          Logout
         </button>
       </div>
 
-      {/* CONTENT */}
-      <div>
-        {page === "department" && <Department />}
-        {page === "employee" && <Employee />}
-      </div>
+      {/* 🔹 PAGE SWITCH */}
+      {page === "department" && <Department />}
+      {page === "employee" && <Employee />}
     </div>
   );
 }
