@@ -4,6 +4,7 @@ const mysql = require("mysql2");
 
 const app = express();
 const PORT = 5000;
+app.listen(PORT, () => console.log("Server running"));
 
 app.use(cors());
 app.use(express.json());
