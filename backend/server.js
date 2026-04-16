@@ -1,153 +1,124 @@
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql2");
+const { Pool } = require("pg");
 
 const app = express();
-const PORT = 5000;
-app.listen(PORT, () => console.log("Server running"));
-
 app.use(cors());
 app.use(express.json());
 
-/* DATABASE CONNECTION */
-
-const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "root",
-  database: "hrm_system"
+// PostgreSQL Connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-db.connect((err) => {
-  if (err) {
-    console.log("Database connection failed:", err);
-  } else {
-    console.log("Connected to MySQL Database");
+// Test DB Connection
+pool.connect()
+  .then(() => console.log("Connected to PostgreSQL"))
+  .catch(err => console.error("DB Error:", err));
+
+/* ================= DEPARTMENT APIs ================= */
+
+// Get Active Departments
+app.get("/departments", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM departments WHERE is_deleted = FALSE"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching departments");
   }
 });
 
-/* TEST ROUTE */
-
-app.get("/", (req, res) => {
-  res.send("HRM Backend Server is Running");
+// Get Deleted Departments
+app.get("/deleted-departments", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM departments WHERE is_deleted = TRUE"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching deleted departments");
+  }
 });
 
-/* ================= DEPARTMENT ================= */
+// Add Department
+app.post("/add-department", async (req, res) => {
+  try {
+    const { dept_name, description } = req.body;
 
-/* ADD */
-app.post("/add-department", (req, res) => {
-  const { dept_name, description } = req.body;
+    await pool.query(
+      "INSERT INTO departments (dept_name, description) VALUES ($1, $2)",
+      [dept_name, description]
+    );
 
-  const sql = `
-    INSERT INTO department (dept_name, description, created_at, updated_at, status)
-    VALUES (?, ?, NOW(), NOW(), TRUE)
-  `;
-
-  db.query(sql, [dept_name, description], (err) => {
-    if (err) return res.status(500).send(err);
-    res.send("Department added");
-  });
+    res.send("Department Added");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error adding department");
+  }
 });
 
-/* GET ACTIVE */
-app.get("/departments", (req, res) => {
-  db.query("SELECT * FROM department WHERE status=TRUE", (err, result) => {
-    if (err) return res.status(500).send(err);
-    res.json(result);
-  });
+// Update Department
+app.put("/update-department/:id", async (req, res) => {
+  try {
+    const { dept_name, description } = req.body;
+    const id = req.params.id;
+
+    await pool.query(
+      "UPDATE departments SET dept_name=$1, description=$2 WHERE dept_id=$3",
+      [dept_name, description, id]
+    );
+
+    res.send("Department Updated");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error updating department");
+  }
 });
 
-/* GET DELETED */
-app.get("/deleted-departments", (req, res) => {
-  db.query("SELECT * FROM department WHERE status=FALSE", (err, result) => {
-    if (err) return res.status(500).send(err);
-    res.json(result);
-  });
+// Soft Delete Department
+app.delete("/delete-department/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    await pool.query(
+      "UPDATE departments SET is_deleted = TRUE WHERE dept_id=$1",
+      [id]
+    );
+
+    res.send("Department Deleted");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error deleting department");
+  }
 });
 
-/* UPDATE */
-app.put("/update-department/:id", (req, res) => {
-  const { dept_name, description } = req.body;
+// Restore Department
+app.put("/restore-department/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
 
-  const sql = `
-    UPDATE department 
-    SET dept_name=?, description=?, updated_at=NOW()
-    WHERE dept_id=?
-  `;
+    await pool.query(
+      "UPDATE departments SET is_deleted = FALSE WHERE dept_id=$1",
+      [id]
+    );
 
-  db.query(sql, [dept_name, description, req.params.id], (err) => {
-    if (err) return res.status(500).send(err);
-    res.send("Updated");
-  });
+    res.send("Department Restored");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error restoring department");
+  }
 });
 
-/* DELETE (SOFT) */
-app.delete("/delete-department/:id", (req, res) => {
-  db.query(
-    "UPDATE department SET status=FALSE WHERE dept_id=?",
-    [req.params.id],
-    (err) => {
-      if (err) return res.status(500).send(err);
-      res.send("Deleted");
-    }
-  );
-});
+/* ================= SERVER ================= */
 
-/* RESTORE */
-app.put("/restore-department/:id", (req, res) => {
-  db.query(
-    "UPDATE department SET status=TRUE WHERE dept_id=?",
-    [req.params.id],
-    (err) => {
-      if (err) return res.status(500).send(err);
-      res.send("Restored");
-    }
-  );
-});
-
-/* ================= EMPLOYEE ================= */
-
-/* ADD */
-app.post("/add-employee", (req, res) => {
-  const { emp_name, email, dept_id } = req.body;
-
-  const sql = `
-    INSERT INTO employee (emp_name, email, dept_id, created_at, updated_at, status)
-    VALUES (?, ?, ?, NOW(), NOW(), TRUE)
-  `;
-
-  db.query(sql, [emp_name, email, dept_id], (err) => {
-    if (err) return res.status(500).send(err);
-    res.send("Employee added");
-  });
-});
-
-/* GET */
-app.get("/employees", (req, res) => {
-  const sql = `
-    SELECT e.emp_id, e.emp_name, e.email, d.dept_name, e.dept_id
-    FROM employee e
-    JOIN department d ON e.dept_id = d.dept_id
-    WHERE e.status=TRUE
-  `;
-
-  db.query(sql, (err, result) => {
-    if (err) return res.status(500).send(err);
-    res.json(result);
-  });
-});
-
-/* DELETE */
-app.delete("/delete-employee/:id", (req, res) => {
-  db.query(
-    "UPDATE employee SET status=FALSE WHERE emp_id=?",
-    [req.params.id],
-    (err) => {
-      if (err) return res.status(500).send(err);
-      res.send("Employee deleted");
-    }
-  );
-});
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
