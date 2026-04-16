@@ -19,6 +19,25 @@ pool.connect()
   .then(() => console.log("Connected to PostgreSQL"))
   .catch(err => console.error("DB Error:", err));
 
+/* 🔥 AUTO CREATE TABLE */
+const createTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS departments (
+        dept_id SERIAL PRIMARY KEY,
+        dept_name VARCHAR(100),
+        description VARCHAR(255),
+        is_deleted BOOLEAN DEFAULT FALSE
+      )
+    `);
+    console.log("Departments table ready");
+  } catch (err) {
+    console.error("Table creation error:", err);
+  }
+};
+
+createTable();
+
 /* ================= DEPARTMENT APIs ================= */
 
 // Get Active Departments
@@ -29,8 +48,8 @@ app.get("/departments", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching departments");
+    console.error("ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -42,8 +61,8 @@ app.get("/deleted-departments", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching deleted departments");
+    console.error("ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -59,8 +78,8 @@ app.post("/add-department", async (req, res) => {
 
     res.send("Department Added");
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error adding department");
+    console.error("ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -77,12 +96,12 @@ app.put("/update-department/:id", async (req, res) => {
 
     res.send("Department Updated");
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error updating department");
+    console.error("ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Soft Delete Department
+// Soft Delete
 app.delete("/delete-department/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -94,12 +113,12 @@ app.delete("/delete-department/:id", async (req, res) => {
 
     res.send("Department Deleted");
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error deleting department");
+    console.error("ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Restore Department
+// Restore
 app.put("/restore-department/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -111,8 +130,8 @@ app.put("/restore-department/:id", async (req, res) => {
 
     res.send("Department Restored");
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error restoring department");
+    console.error("ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
