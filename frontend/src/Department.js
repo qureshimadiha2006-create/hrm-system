@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+const BASE_URL = "https://hrm-system-madiha.onrender.com";
+
 function Department() {
   const [departments, setDepartments] = useState([]);
   const [deletedDepartments, setDeletedDepartments] = useState([]);
@@ -15,12 +17,12 @@ function Department() {
   }, []);
 
   const fetchDepartments = async () => {
-    const res = await axios.get("https://hrm-system-madiha.onrender.com/departments");
+    const res = await axios.get(`${BASE_URL}/departments`);
     setDepartments(res.data);
   };
 
   const fetchDeletedDepartments = async () => {
-    const res = await axios.get("https://hrm-system-madiha.onrender.com/deleted-departments");
+    const res = await axios.get(`${BASE_URL}/deleted-departments`);
     setDeletedDepartments(res.data);
   };
 
@@ -31,12 +33,12 @@ function Department() {
     }
 
     if (editId) {
-      await axios.put(`https://hrm-system-madiha.onrender.com/update-department/${editId}`, {
+      await axios.put(`${BASE_URL}/update-department/${editId}`, {
         dept_name,
         description,
       });
     } else {
-      await axios.post("https://hrm-system-madiha.onrender.com/add-department", {
+      await axios.post(`${BASE_URL}/add-department`, {
         dept_name,
         description,
       });
@@ -52,14 +54,14 @@ function Department() {
 
   const deleteDepartment = async (id) => {
     if (window.confirm("Are you sure?")) {
-      await axios.delete(`https://hrm-system-madiha.onrender.com/delete-department/${id}`);
+      await axios.delete(`${BASE_URL}/delete-department/${id}`);
       fetchDepartments();
       fetchDeletedDepartments();
     }
   };
 
   const restoreDepartment = async (id) => {
-    await axios.put(`https://hrm-system-madiha.onrender.com/restore-department/${id}`);
+    await axios.put(`${BASE_URL}/restore-department/${id}`);
     fetchDepartments();
     fetchDeletedDepartments();
   };
