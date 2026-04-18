@@ -245,7 +245,9 @@ app.put("/restore-role/:id", async (req, res) => {
     res.status(500).send("Error restoring role");
   }
 });
-
+app.get("/", (req, res) => {
+  res.send("HRM Backend Running 🚀");
+});
 /* ================= SERVER ================= */
 
 const PORT = process.env.PORT || 5000;
