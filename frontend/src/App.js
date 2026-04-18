@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Department from "./Department";
 import Employee from "./Employee";
+import Role from "./Role";   // ✅ ADD THIS
 import Login from "./Login";
 
 function App() {
@@ -25,6 +26,11 @@ function App() {
           Employee
         </button>
 
+        {/* ✅ NEW ROLE BUTTON */}
+        <button onClick={() => setPage("role")}>
+          Role
+        </button>
+
         <button onClick={() => setIsLoggedIn(false)}>
           Logout
         </button>
@@ -33,6 +39,7 @@ function App() {
       {/* 🔹 PAGE SWITCH */}
       {page === "department" && <Department />}
       {page === "employee" && <Employee />}
+      {page === "role" && <Role />}   {/* ✅ ADD THIS */}
     </div>
   );
 }
