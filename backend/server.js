@@ -13,10 +13,9 @@ app.use(express.json());
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
+  ssl: process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
 pool.connect()
@@ -68,8 +67,13 @@ const initDB = async () => {
 
 initDB();
 
-/* ================= SAFE FIX ROUTE ================= */
-/* 👉 YOU RUN THIS ONLY ONCE IN BROWSER */
+/* ================= ROOT ================= */
+
+app.get("/", (req, res) => {
+  res.send("🚀 HRM Backend Running Successfully");
+});
+
+/* ================= FIX DB (RUN ONCE) ================= */
 
 app.get("/fix-db", async (req, res) => {
   try {
@@ -77,7 +81,7 @@ app.get("/fix-db", async (req, res) => {
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS address TEXT`);
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS region VARCHAR(50)`);
 
-    res.send("✅ DB Migration Completed Successfully");
+    res.send("✅ DB Migration Completed");
   } catch (err) {
     console.error(err);
     res.status(500).json(err.message);
@@ -192,7 +196,7 @@ app.get("/employees", async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error("EMP ERROR:", err);
+    console.error(err);
     res.status(500).json(err.message);
   }
 });
@@ -228,7 +232,7 @@ app.post("/add-employee", async (req, res) => {
 
     res.send("Employee Added");
   } catch (err) {
-    console.error("ADD EMP ERROR:", err);
+    console.error(err);
     res.status(500).json(err.message);
   }
 });
@@ -272,7 +276,7 @@ app.put("/update-employee/:id", async (req, res) => {
 
     res.send("Employee Updated");
   } catch (err) {
-    console.error("UPDATE EMP ERROR:", err);
+    console.error(err);
     res.status(500).json(err.message);
   }
 });
@@ -288,12 +292,6 @@ app.delete("/delete-employee/:id", async (req, res) => {
   } catch (err) {
     res.status(500).json(err.message);
   }
-});
-
-/* ================= ROOT ================= */
-
-app.get("/", (req, res) => {
-  res.send("🚀 HRM Backend Running Successfully");
 });
 
 /* ================= SERVER ================= */
