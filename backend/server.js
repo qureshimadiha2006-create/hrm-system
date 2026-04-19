@@ -12,9 +12,10 @@ app.use(express.json());
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production"
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: false }
+      : false,
 });
 
 pool.connect()
@@ -48,6 +49,9 @@ const createTables = async () => {
         emp_id SERIAL PRIMARY KEY,
         emp_name VARCHAR(100),
         email VARCHAR(100),
+        phone VARCHAR(20),
+        address TEXT,
+        region VARCHAR(50),
         role_id INT,
         dept_id INT,
         manager_id INT,
@@ -156,17 +160,6 @@ app.get("/roles", async (req, res) => {
   }
 });
 
-app.get("/deleted-roles", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM roles WHERE is_deleted = TRUE"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
 app.post("/add-role", async (req, res) => {
   try {
     const { role_name, description } = req.body;
@@ -210,28 +203,24 @@ app.delete("/delete-role/:id", async (req, res) => {
   }
 });
 
-app.put("/restore-role/:id", async (req, res) => {
-  try {
-    await pool.query(
-      "UPDATE roles SET is_deleted = FALSE WHERE role_id=$1",
-      [req.params.id]
-    );
-
-    res.send("Role Restored");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
 /* ================= EMPLOYEES ================= */
 
 app.get("/employees", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT e.emp_id, e.emp_name, e.email,
-             r.role_name,
-             d.dept_name,
-             m.emp_name AS manager_name
+      SELECT 
+        e.emp_id,
+        e.emp_name,
+        e.email,
+        e.phone,
+        e.address,
+        e.region,
+        e.role_id,
+        e.dept_id,
+        e.manager_id,
+        r.role_name,
+        d.dept_name,
+        m.emp_name AS manager_name
       FROM employees e
       LEFT JOIN roles r ON e.role_id = r.role_id
       LEFT JOIN departments d ON e.dept_id = d.dept_id
@@ -245,13 +234,34 @@ app.get("/employees", async (req, res) => {
   }
 });
 
+/* ADD EMPLOYEE */
 app.post("/add-employee", async (req, res) => {
   try {
-    const { emp_name, email, role_id, dept_id, manager_id } = req.body;
+    const {
+      emp_name,
+      email,
+      phone,
+      address,
+      region,
+      role_id,
+      dept_id,
+      manager_id
+    } = req.body;
 
     await pool.query(
-      "INSERT INTO employees (emp_name, email, role_id, dept_id, manager_id) VALUES ($1,$2,$3,$4,$5)",
-      [emp_name, email, role_id, dept_id, manager_id || null]
+      `INSERT INTO employees 
+      (emp_name, email, phone, address, region, role_id, dept_id, manager_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        emp_name,
+        email,
+        phone,
+        address,
+        region,
+        role_id,
+        dept_id,
+        manager_id || null
+      ]
     );
 
     res.send("Employee Added");
@@ -260,13 +270,42 @@ app.post("/add-employee", async (req, res) => {
   }
 });
 
+/* UPDATE EMPLOYEE */
 app.put("/update-employee/:id", async (req, res) => {
   try {
-    const { emp_name, email, role_id, dept_id, manager_id } = req.body;
+    const {
+      emp_name,
+      email,
+      phone,
+      address,
+      region,
+      role_id,
+      dept_id,
+      manager_id
+    } = req.body;
 
     await pool.query(
-      "UPDATE employees SET emp_name=$1, email=$2, role_id=$3, dept_id=$4, manager_id=$5 WHERE emp_id=$6",
-      [emp_name, email, role_id, dept_id, manager_id || null, req.params.id]
+      `UPDATE employees 
+       SET emp_name=$1,
+           email=$2,
+           phone=$3,
+           address=$4,
+           region=$5,
+           role_id=$6,
+           dept_id=$7,
+           manager_id=$8
+       WHERE emp_id=$9`,
+      [
+        emp_name,
+        email,
+        phone,
+        address,
+        region,
+        role_id,
+        dept_id,
+        manager_id || null,
+        req.params.id
+      ]
     );
 
     res.send("Employee Updated");
@@ -275,6 +314,7 @@ app.put("/update-employee/:id", async (req, res) => {
   }
 });
 
+/* DELETE EMPLOYEE (soft delete) */
 app.delete("/delete-employee/:id", async (req, res) => {
   try {
     await pool.query(
