@@ -27,7 +27,7 @@ function Employee() {
       const res = await axios.get(`${BASE_URL}/employees`);
       setEmployees(res.data);
     } catch (err) {
-      console.error("EMPLOYEE ERROR", err);
+      console.error(err);
     }
   };
 
@@ -36,7 +36,7 @@ function Employee() {
       const res = await axios.get(`${BASE_URL}/roles`);
       setRoles(res.data);
     } catch (err) {
-      console.error("ROLE ERROR", err);
+      console.error(err);
     }
   };
 
@@ -45,47 +45,34 @@ function Employee() {
       const res = await axios.get(`${BASE_URL}/departments`);
       setDepartments(res.data);
     } catch (err) {
-      console.error("DEPT ERROR", err);
+      console.error(err);
     }
   };
 
   const handleSubmit = async () => {
-    console.log("🔥 ADD CLICKED");
-
-    console.log({
-      emp_name,
-      email,
-      role_id,
-      dept_id,
-      manager_id
-    });
-
     if (!emp_name || !email || !role_id || !dept_id) {
       alert("Fill all fields");
       return;
     }
 
     try {
+      const payload = {
+        emp_name,
+        email,
+        role_id: parseInt(role_id),
+        dept_id: parseInt(dept_id),
+        manager_id: manager_id ? parseInt(manager_id) : null
+      };
+
       if (editId) {
-        await axios.put(`${BASE_URL}/update-employee/${editId}`, {
-          emp_name,
-          email,
-          role_id,
-          dept_id,
-          manager_id
-        });
+        await axios.put(`${BASE_URL}/update-employee/${editId}`, payload);
       } else {
-        await axios.post(`${BASE_URL}/add-employee`, {
-          emp_name,
-          email,
-          role_id,
-          dept_id,
-          manager_id
-        });
+        await axios.post(`${BASE_URL}/add-employee`, payload);
       }
 
       alert("✅ Employee Saved");
 
+      // RESET
       setEmpName("");
       setEmail("");
       setRoleId("");
@@ -96,14 +83,16 @@ function Employee() {
       fetchEmployees();
 
     } catch (err) {
-      console.error("❌ ADD ERROR:", err);
-      alert("Error adding employee");
+      console.error("❌ ERROR:", err);
+      alert("Error saving employee");
     }
   };
 
   const deleteEmployee = async (id) => {
-    await axios.delete(`${BASE_URL}/delete-employee/${id}`);
-    fetchEmployees();
+    if (window.confirm("Delete employee?")) {
+      await axios.delete(`${BASE_URL}/delete-employee/${id}`);
+      fetchEmployees();
+    }
   };
 
   const editEmployee = (emp) => {
@@ -111,13 +100,13 @@ function Employee() {
     setEmail(emp.email);
     setRoleId(emp.role_id);
     setDeptId(emp.dept_id);
-    setManagerId(emp.manager_id);
+    setManagerId(emp.manager_id || "");
     setEditId(emp.emp_id);
   };
 
   return (
     <div style={{ textAlign: "center" }}>
-      <h2>Employee Module</h2>
+      <h2>{editId ? "Update Employee" : "Add Employee"}</h2>
 
       <input
         placeholder="Name"
@@ -133,6 +122,7 @@ function Employee() {
 
       <br /><br />
 
+      {/* ROLE DROPDOWN */}
       <select value={role_id} onChange={(e) => setRoleId(e.target.value)}>
         <option value="">Select Role</option>
         {roles.map((r) => (
@@ -142,6 +132,7 @@ function Employee() {
         ))}
       </select>
 
+      {/* DEPARTMENT DROPDOWN */}
       <select value={dept_id} onChange={(e) => setDeptId(e.target.value)}>
         <option value="">Select Department</option>
         {departments.map((d) => (
@@ -151,6 +142,7 @@ function Employee() {
         ))}
       </select>
 
+      {/* MANAGER DROPDOWN */}
       <select value={manager_id} onChange={(e) => setManagerId(e.target.value)}>
         <option value="">Select Manager</option>
         {employees.map((e) => (
@@ -174,7 +166,7 @@ function Employee() {
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
-            <th>Dept</th>
+            <th>Department</th>
             <th>Manager</th>
             <th>Action</th>
           </tr>
@@ -185,9 +177,12 @@ function Employee() {
             <tr key={emp.emp_id}>
               <td>{emp.emp_name}</td>
               <td>{emp.email}</td>
-              <td>{emp.role_id}</td>
-              <td>{emp.dept_id}</td>
-              <td>{emp.manager_id}</td>
+
+              {/* SHOW NAMES INSTEAD OF IDs */}
+              <td>{emp.role_name || emp.role_id}</td>
+              <td>{emp.dept_name || emp.dept_id}</td>
+              <td>{emp.manager_name || "-"}</td>
+
               <td>
                 <button onClick={() => editEmployee(emp)}>Edit</button>
                 <button onClick={() => deleteEmployee(emp.emp_id)}>Delete</button>

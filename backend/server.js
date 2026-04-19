@@ -25,7 +25,6 @@ pool.connect()
 /* 🔥 CREATE TABLES */
 const createTables = async () => {
   try {
-    // Departments
     await pool.query(`
       CREATE TABLE IF NOT EXISTS departments (
         dept_id SERIAL PRIMARY KEY,
@@ -35,7 +34,6 @@ const createTables = async () => {
       )
     `);
 
-    // Roles
     await pool.query(`
       CREATE TABLE IF NOT EXISTS roles (
         role_id SERIAL PRIMARY KEY,
@@ -45,7 +43,6 @@ const createTables = async () => {
       )
     `);
 
-    // Employees ✅ NEW
     await pool.query(`
       CREATE TABLE IF NOT EXISTS employees (
         emp_id SERIAL PRIMARY KEY,
@@ -58,9 +55,9 @@ const createTables = async () => {
       )
     `);
 
-    console.log("✅ All tables ready");
+    console.log("✅ Tables ready");
   } catch (err) {
-    console.error("❌ Table error:", err);
+    console.error("❌ Table Error:", err);
   }
 };
 
@@ -69,122 +66,132 @@ createTables();
 /* ================= DEPARTMENT ================= */
 
 app.get("/departments", async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM departments WHERE is_deleted = FALSE"
-  );
-  res.json(result.rows);
+  try {
+    const result = await pool.query(
+      "SELECT * FROM departments WHERE is_deleted = FALSE"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
 });
 
 app.post("/add-department", async (req, res) => {
-  const { dept_name, description } = req.body;
+  try {
+    const { dept_name, description } = req.body;
 
-  await pool.query(
-    "INSERT INTO departments (dept_name, description) VALUES ($1,$2)",
-    [dept_name, description]
-  );
+    await pool.query(
+      "INSERT INTO departments (dept_name, description) VALUES ($1,$2)",
+      [dept_name, description]
+    );
 
-  res.send("Department Added");
-});
-
-app.put("/update-department/:id", async (req, res) => {
-  const { dept_name, description } = req.body;
-
-  await pool.query(
-    "UPDATE departments SET dept_name=$1, description=$2 WHERE dept_id=$3",
-    [dept_name, description, req.params.id]
-  );
-
-  res.send("Updated");
-});
-
-app.delete("/delete-department/:id", async (req, res) => {
-  await pool.query(
-    "UPDATE departments SET is_deleted=TRUE WHERE dept_id=$1",
-    [req.params.id]
-  );
-  res.send("Deleted");
+    res.send("Department Added");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
 });
 
 /* ================= ROLE ================= */
 
 app.get("/roles", async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM roles WHERE is_deleted = FALSE"
-  );
-  res.json(result.rows);
+  try {
+    const result = await pool.query(
+      "SELECT * FROM roles WHERE is_deleted = FALSE"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
 });
 
 app.post("/add-role", async (req, res) => {
-  const { role_name, description } = req.body;
+  try {
+    const { role_name, description } = req.body;
 
-  await pool.query(
-    "INSERT INTO roles (role_name, description) VALUES ($1,$2)",
-    [role_name, description]
-  );
+    await pool.query(
+      "INSERT INTO roles (role_name, description) VALUES ($1,$2)",
+      [role_name, description]
+    );
 
-  res.send("Role Added");
+    res.send("Role Added");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
 });
 
-app.put("/update-role/:id", async (req, res) => {
-  const { role_name, description } = req.body;
+/* ================= EMPLOYEE ================= */
 
-  await pool.query(
-    "UPDATE roles SET role_name=$1, description=$2 WHERE role_id=$3",
-    [role_name, description, req.params.id]
-  );
-
-  res.send("Updated");
-});
-
-app.delete("/delete-role/:id", async (req, res) => {
-  await pool.query(
-    "UPDATE roles SET is_deleted=TRUE WHERE role_id=$1",
-    [req.params.id]
-  );
-  res.send("Deleted");
-});
-
-/* ================= EMPLOYEE (NEW MODULE) ================= */
-
-// ✅ GET Employees
+// ✅ GET Employees (WITH NAMES)
 app.get("/employees", async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM employees WHERE is_deleted = FALSE"
-  );
-  res.json(result.rows);
+  try {
+    const result = await pool.query(`
+      SELECT e.emp_id, e.emp_name, e.email,
+             r.role_name,
+             d.dept_name,
+             m.emp_name AS manager_name
+      FROM employees e
+      LEFT JOIN roles r ON e.role_id = r.role_id
+      LEFT JOIN departments d ON e.dept_id = d.dept_id
+      LEFT JOIN employees m ON e.manager_id = m.emp_id
+      WHERE e.is_deleted = FALSE
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(err.message);
+  }
 });
 
 // ✅ ADD Employee
 app.post("/add-employee", async (req, res) => {
-  const { emp_name, email, role_id, dept_id, manager_id } = req.body;
+  try {
+    const { emp_name, email, role_id, dept_id, manager_id } = req.body;
 
-  await pool.query(
-    "INSERT INTO employees (emp_name, email, role_id, dept_id, manager_id) VALUES ($1,$2,$3,$4,$5)",
-    [emp_name, email, role_id, dept_id, manager_id]
-  );
+    if (!emp_name || !email || !role_id || !dept_id) {
+      return res.status(400).send("Missing fields");
+    }
 
-  res.send("Employee Added");
+    await pool.query(
+      "INSERT INTO employees (emp_name, email, role_id, dept_id, manager_id) VALUES ($1,$2,$3,$4,$5)",
+      [emp_name, email, role_id, dept_id, manager_id || null]
+    );
+
+    res.send("Employee Added");
+  } catch (err) {
+    console.error("❌ ADD ERROR:", err);
+    res.status(500).json(err.message);
+  }
 });
 
 // ✅ UPDATE Employee
 app.put("/update-employee/:id", async (req, res) => {
-  const { emp_name, email, role_id, dept_id, manager_id } = req.body;
+  try {
+    const { emp_name, email, role_id, dept_id, manager_id } = req.body;
 
-  await pool.query(
-    "UPDATE employees SET emp_name=$1, email=$2, role_id=$3, dept_id=$4, manager_id=$5 WHERE emp_id=$6",
-    [emp_name, email, role_id, dept_id, manager_id, req.params.id]
-  );
+    await pool.query(
+      "UPDATE employees SET emp_name=$1, email=$2, role_id=$3, dept_id=$4, manager_id=$5 WHERE emp_id=$6",
+      [emp_name, email, role_id, dept_id, manager_id || null, req.params.id]
+    );
 
-  res.send("Employee Updated");
+    res.send("Updated");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
 });
 
-// ✅ DELETE Employee
+// ✅ DELETE (SOFT)
 app.delete("/delete-employee/:id", async (req, res) => {
-  await pool.query(
-    "UPDATE employees SET is_deleted=TRUE WHERE emp_id=$1",
-    [req.params.id]
-  );
-  res.send("Employee Deleted");
+  try {
+    await pool.query(
+      "UPDATE employees SET is_deleted=TRUE WHERE emp_id=$1",
+      [req.params.id]
+    );
+
+    res.send("Deleted");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
 });
 
 /* ================= ROOT ================= */
