@@ -1,4 +1,5 @@
 console.log("🔥 NEW CODE RUNNING");
+
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
@@ -16,15 +17,15 @@ const pool = new Pool({
       : false,
 });
 
-// ✅ Test DB Connection
+// ✅ Test DB
 pool.connect()
   .then(() => console.log("✅ Connected to PostgreSQL"))
   .catch(err => console.error("❌ DB Error:", err));
 
-/* 🔥 AUTO CREATE TABLES */
+/* 🔥 CREATE TABLES */
 const createTables = async () => {
   try {
-    // Departments table
+    // Departments
     await pool.query(`
       CREATE TABLE IF NOT EXISTS departments (
         dept_id SERIAL PRIMARY KEY,
@@ -34,7 +35,7 @@ const createTables = async () => {
       )
     `);
 
-    // Roles table
+    // Roles
     await pool.query(`
       CREATE TABLE IF NOT EXISTS roles (
         role_id SERIAL PRIMARY KEY,
@@ -44,210 +45,154 @@ const createTables = async () => {
       )
     `);
 
-    console.log("✅ Tables ready");
+    // Employees ✅ NEW
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        emp_id SERIAL PRIMARY KEY,
+        emp_name VARCHAR(100),
+        email VARCHAR(100),
+        role_id INT,
+        dept_id INT,
+        manager_id INT,
+        is_deleted BOOLEAN DEFAULT FALSE
+      )
+    `);
+
+    console.log("✅ All tables ready");
   } catch (err) {
-    console.error("❌ Table creation error:", err);
+    console.error("❌ Table error:", err);
   }
 };
 
 createTables();
 
-/* ================= DEPARTMENT APIs ================= */
+/* ================= DEPARTMENT ================= */
 
-// Get Active Departments
 app.get("/departments", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM departments WHERE is_deleted = FALSE"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching departments");
-  }
+  const result = await pool.query(
+    "SELECT * FROM departments WHERE is_deleted = FALSE"
+  );
+  res.json(result.rows);
 });
 
-// Get Deleted Departments
-app.get("/deleted-departments", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM departments WHERE is_deleted = TRUE"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching deleted departments");
-  }
-});
-
-// Add Department
 app.post("/add-department", async (req, res) => {
-  try {
-    const { dept_name, description } = req.body;
+  const { dept_name, description } = req.body;
 
-    await pool.query(
-      "INSERT INTO departments (dept_name, description) VALUES ($1, $2)",
-      [dept_name, description]
-    );
+  await pool.query(
+    "INSERT INTO departments (dept_name, description) VALUES ($1,$2)",
+    [dept_name, description]
+  );
 
-    res.send("Department Added");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error adding department");
-  }
+  res.send("Department Added");
 });
 
-// Update Department
 app.put("/update-department/:id", async (req, res) => {
-  try {
-    const { dept_name, description } = req.body;
-    const id = req.params.id;
+  const { dept_name, description } = req.body;
 
-    await pool.query(
-      "UPDATE departments SET dept_name=$1, description=$2 WHERE dept_id=$3",
-      [dept_name, description, id]
-    );
+  await pool.query(
+    "UPDATE departments SET dept_name=$1, description=$2 WHERE dept_id=$3",
+    [dept_name, description, req.params.id]
+  );
 
-    res.send("Department Updated");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error updating department");
-  }
+  res.send("Updated");
 });
 
-// Delete Department
 app.delete("/delete-department/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    await pool.query(
-      "UPDATE departments SET is_deleted = TRUE WHERE dept_id=$1",
-      [id]
-    );
-
-    res.send("Department Deleted");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error deleting department");
-  }
+  await pool.query(
+    "UPDATE departments SET is_deleted=TRUE WHERE dept_id=$1",
+    [req.params.id]
+  );
+  res.send("Deleted");
 });
 
-// Restore Department
-app.put("/restore-department/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
+/* ================= ROLE ================= */
 
-    await pool.query(
-      "UPDATE departments SET is_deleted = FALSE WHERE dept_id=$1",
-      [id]
-    );
-
-    res.send("Department Restored");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error restoring department");
-  }
-});
-
-/* ================= ROLE APIs ================= */
-
-// Get Active Roles
 app.get("/roles", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM roles WHERE is_deleted = FALSE"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching roles");
-  }
+  const result = await pool.query(
+    "SELECT * FROM roles WHERE is_deleted = FALSE"
+  );
+  res.json(result.rows);
 });
 
-// Get Deleted Roles
-app.get("/deleted-roles", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM roles WHERE is_deleted = TRUE"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching deleted roles");
-  }
-});
-
-// Add Role
 app.post("/add-role", async (req, res) => {
-  try {
-    const { role_name, description } = req.body;
+  const { role_name, description } = req.body;
 
-    await pool.query(
-      "INSERT INTO roles (role_name, description) VALUES ($1, $2)",
-      [role_name, description]
-    );
+  await pool.query(
+    "INSERT INTO roles (role_name, description) VALUES ($1,$2)",
+    [role_name, description]
+  );
 
-    res.send("Role Added");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error adding role");
-  }
+  res.send("Role Added");
 });
 
-// Update Role
 app.put("/update-role/:id", async (req, res) => {
-  try {
-    const { role_name, description } = req.body;
-    const id = req.params.id;
+  const { role_name, description } = req.body;
 
-    await pool.query(
-      "UPDATE roles SET role_name=$1, description=$2 WHERE role_id=$3",
-      [role_name, description, id]
-    );
+  await pool.query(
+    "UPDATE roles SET role_name=$1, description=$2 WHERE role_id=$3",
+    [role_name, description, req.params.id]
+  );
 
-    res.send("Role Updated");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error updating role");
-  }
+  res.send("Updated");
 });
 
-// Delete Role
 app.delete("/delete-role/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    await pool.query(
-      "UPDATE roles SET is_deleted = TRUE WHERE role_id=$1",
-      [id]
-    );
-
-    res.send("Role Deleted");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error deleting role");
-  }
+  await pool.query(
+    "UPDATE roles SET is_deleted=TRUE WHERE role_id=$1",
+    [req.params.id]
+  );
+  res.send("Deleted");
 });
 
-// Restore Role
-app.put("/restore-role/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
+/* ================= EMPLOYEE (NEW MODULE) ================= */
 
-    await pool.query(
-      "UPDATE roles SET is_deleted = FALSE WHERE role_id=$1",
-      [id]
-    );
-
-    res.send("Role Restored");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error restoring role");
-  }
+// ✅ GET Employees
+app.get("/employees", async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM employees WHERE is_deleted = FALSE"
+  );
+  res.json(result.rows);
 });
+
+// ✅ ADD Employee
+app.post("/add-employee", async (req, res) => {
+  const { emp_name, email, role_id, dept_id, manager_id } = req.body;
+
+  await pool.query(
+    "INSERT INTO employees (emp_name, email, role_id, dept_id, manager_id) VALUES ($1,$2,$3,$4,$5)",
+    [emp_name, email, role_id, dept_id, manager_id]
+  );
+
+  res.send("Employee Added");
+});
+
+// ✅ UPDATE Employee
+app.put("/update-employee/:id", async (req, res) => {
+  const { emp_name, email, role_id, dept_id, manager_id } = req.body;
+
+  await pool.query(
+    "UPDATE employees SET emp_name=$1, email=$2, role_id=$3, dept_id=$4, manager_id=$5 WHERE emp_id=$6",
+    [emp_name, email, role_id, dept_id, manager_id, req.params.id]
+  );
+
+  res.send("Employee Updated");
+});
+
+// ✅ DELETE Employee
+app.delete("/delete-employee/:id", async (req, res) => {
+  await pool.query(
+    "UPDATE employees SET is_deleted=TRUE WHERE emp_id=$1",
+    [req.params.id]
+  );
+  res.send("Employee Deleted");
+});
+
+/* ================= ROOT ================= */
+
 app.get("/", (req, res) => {
   res.send("HRM Backend Running 🚀");
 });
+
 /* ================= SERVER ================= */
 
 const PORT = process.env.PORT || 5000;
