@@ -22,7 +22,7 @@ pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
   .catch(err => console.error("❌ DB Error:", err));
 
-/* ================= AUTO SAFE TABLE CREATION ================= */
+/* ================= INIT TABLES ================= */
 
 const initDB = async () => {
   try {
@@ -67,7 +67,8 @@ const initDB = async () => {
 
 initDB();
 
-/* ================= SAFE MIGRATION ENDPOINT (IMPORTANT FOR RENDER) ================= */
+/* ================= SAFE FIX ROUTE ================= */
+/* 👉 YOU RUN THIS ONLY ONCE IN BROWSER */
 
 app.get("/fix-db", async (req, res) => {
   try {
@@ -75,8 +76,9 @@ app.get("/fix-db", async (req, res) => {
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS address TEXT`);
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS region VARCHAR(50)`);
 
-    res.send("✅ Database Migration Done");
+    res.send("✅ DB Migration Completed Successfully");
   } catch (err) {
+    console.error(err);
     res.status(500).json(err.message);
   }
 });
@@ -94,6 +96,17 @@ app.get("/departments", async (req, res) => {
   }
 });
 
+app.get("/deleted-departments", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM departments WHERE is_deleted = TRUE"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+});
+
 app.post("/add-department", async (req, res) => {
   try {
     const { dept_name, description } = req.body;
@@ -104,6 +117,19 @@ app.post("/add-department", async (req, res) => {
     );
 
     res.send("Department Added");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+});
+
+app.delete("/delete-department/:id", async (req, res) => {
+  try {
+    await pool.query(
+      "UPDATE departments SET is_deleted = TRUE WHERE dept_id=$1",
+      [req.params.id]
+    );
+
+    res.send("Department Deleted");
   } catch (err) {
     res.status(500).json(err.message);
   }
@@ -160,16 +186,15 @@ app.get("/employees", async (req, res) => {
       LEFT JOIN departments d ON e.dept_id = d.dept_id
       LEFT JOIN employees m ON e.manager_id = m.emp_id
       WHERE e.is_deleted = FALSE
+      ORDER BY e.emp_id DESC
     `);
 
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    console.error("EMP ERROR:", err);
     res.status(500).json(err.message);
   }
 });
-
-/* ADD EMPLOYEE */
 
 app.post("/add-employee", async (req, res) => {
   try {
@@ -191,23 +216,21 @@ app.post("/add-employee", async (req, res) => {
       [
         emp_name,
         email,
-        phone,
-        address,
-        region,
-        role_id,
-        dept_id,
+        phone || null,
+        address || null,
+        region || null,
+        role_id || null,
+        dept_id || null,
         manager_id || null
       ]
     );
 
     res.send("Employee Added");
   } catch (err) {
-    console.error(err);
+    console.error("ADD EMP ERROR:", err);
     res.status(500).json(err.message);
   }
 });
-
-/* UPDATE EMPLOYEE */
 
 app.put("/update-employee/:id", async (req, res) => {
   try {
@@ -248,12 +271,10 @@ app.put("/update-employee/:id", async (req, res) => {
 
     res.send("Employee Updated");
   } catch (err) {
-    console.error(err);
+    console.error("UPDATE EMP ERROR:", err);
     res.status(500).json(err.message);
   }
 });
-
-/* DELETE EMPLOYEE (soft delete) */
 
 app.delete("/delete-employee/:id", async (req, res) => {
   try {
