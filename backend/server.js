@@ -1,3 +1,4 @@
+require("dotenv").config();
 console.log("🔥 HRM SERVER STARTING...");
 
 const express = require("express");
