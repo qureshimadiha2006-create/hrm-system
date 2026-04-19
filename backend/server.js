@@ -1,4 +1,4 @@
-console.log("🔥 NEW CODE RUNNING");
+console.log("🔥 HRM SERVER STARTING...");
 
 const express = require("express");
 const cors = require("cors");
@@ -19,12 +19,12 @@ const pool = new Pool({
 });
 
 pool.connect()
-  .then(() => console.log("✅ Connected to PostgreSQL"))
+  .then(() => console.log("✅ PostgreSQL Connected"))
   .catch(err => console.error("❌ DB Error:", err));
 
-/* ================= TABLES ================= */
+/* ================= AUTO SAFE TABLE CREATION ================= */
 
-const createTables = async () => {
+const initDB = async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS departments (
@@ -59,13 +59,27 @@ const createTables = async () => {
       )
     `);
 
-    console.log("✅ Tables ready");
+    console.log("✅ Tables Ready");
   } catch (err) {
-    console.error("❌ Table Error:", err);
+    console.error("❌ Init DB Error:", err);
   }
 };
 
-createTables();
+initDB();
+
+/* ================= SAFE MIGRATION ENDPOINT (IMPORTANT FOR RENDER) ================= */
+
+app.get("/fix-db", async (req, res) => {
+  try {
+    await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`);
+    await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS address TEXT`);
+    await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS region VARCHAR(50)`);
+
+    res.send("✅ Database Migration Done");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+});
 
 /* ================= DEPARTMENTS ================= */
 
@@ -73,17 +87,6 @@ app.get("/departments", async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT * FROM departments WHERE is_deleted = FALSE"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-app.get("/deleted-departments", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM departments WHERE is_deleted = TRUE"
     );
     res.json(result.rows);
   } catch (err) {
@@ -101,47 +104,6 @@ app.post("/add-department", async (req, res) => {
     );
 
     res.send("Department Added");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-app.put("/update-department/:id", async (req, res) => {
-  try {
-    const { dept_name, description } = req.body;
-
-    await pool.query(
-      "UPDATE departments SET dept_name=$1, description=$2 WHERE dept_id=$3",
-      [dept_name, description, req.params.id]
-    );
-
-    res.send("Department Updated");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-app.delete("/delete-department/:id", async (req, res) => {
-  try {
-    await pool.query(
-      "UPDATE departments SET is_deleted = TRUE WHERE dept_id=$1",
-      [req.params.id]
-    );
-
-    res.send("Department Deleted");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-app.put("/restore-department/:id", async (req, res) => {
-  try {
-    await pool.query(
-      "UPDATE departments SET is_deleted = FALSE WHERE dept_id=$1",
-      [req.params.id]
-    );
-
-    res.send("Department Restored");
   } catch (err) {
     res.status(500).json(err.message);
   }
@@ -175,34 +137,6 @@ app.post("/add-role", async (req, res) => {
   }
 });
 
-app.put("/update-role/:id", async (req, res) => {
-  try {
-    const { role_name, description } = req.body;
-
-    await pool.query(
-      "UPDATE roles SET role_name=$1, description=$2 WHERE role_id=$3",
-      [role_name, description, req.params.id]
-    );
-
-    res.send("Role Updated");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-app.delete("/delete-role/:id", async (req, res) => {
-  try {
-    await pool.query(
-      "UPDATE roles SET is_deleted = TRUE WHERE role_id=$1",
-      [req.params.id]
-    );
-
-    res.send("Role Deleted");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
 /* ================= EMPLOYEES ================= */
 
 app.get("/employees", async (req, res) => {
@@ -230,11 +164,13 @@ app.get("/employees", async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
+    console.error(err);
     res.status(500).json(err.message);
   }
 });
 
 /* ADD EMPLOYEE */
+
 app.post("/add-employee", async (req, res) => {
   try {
     const {
@@ -266,11 +202,13 @@ app.post("/add-employee", async (req, res) => {
 
     res.send("Employee Added");
   } catch (err) {
+    console.error(err);
     res.status(500).json(err.message);
   }
 });
 
 /* UPDATE EMPLOYEE */
+
 app.put("/update-employee/:id", async (req, res) => {
   try {
     const {
@@ -310,11 +248,13 @@ app.put("/update-employee/:id", async (req, res) => {
 
     res.send("Employee Updated");
   } catch (err) {
+    console.error(err);
     res.status(500).json(err.message);
   }
 });
 
 /* DELETE EMPLOYEE (soft delete) */
+
 app.delete("/delete-employee/:id", async (req, res) => {
   try {
     await pool.query(
@@ -331,7 +271,7 @@ app.delete("/delete-employee/:id", async (req, res) => {
 /* ================= ROOT ================= */
 
 app.get("/", (req, res) => {
-  res.send("HRM Backend Running 🚀");
+  res.send("🚀 HRM Backend Running Successfully");
 });
 
 /* ================= SERVER ================= */
