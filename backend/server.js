@@ -74,7 +74,7 @@ const initDB = async () => {
       )
     `);
 
-    // 4. Tasks Table (New Module)
+    // 4. Tasks Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tasks (
         task_id SERIAL PRIMARY KEY,
@@ -90,7 +90,20 @@ const initDB = async () => {
       )
     `);
 
-    // ✅ AUTOMATIC DATABASE FIX: Adds the OTP column if missing
+    // 5. Performance Reviews Table (New Module)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reviews (
+        review_id SERIAL PRIMARY KEY,
+        review_title VARCHAR(255),
+        emp_id INT REFERENCES employees(emp_id),
+        review_date DATE,
+        review_period VARCHAR(50),
+        rating INT,
+        comment TEXT,
+        is_deleted BOOLEAN DEFAULT FALSE
+      )
+    `);
+
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS otp VARCHAR(6)`);
 
     console.log("✅ All Tables Ready & Database Verified");
@@ -107,88 +120,42 @@ app.get("/", (req, res) => {
   res.send("🚀 HRM Backend Running Successfully");
 });
 
-/* ================= FIX DB ================= */
+/* ================= PERFORMANCE REVIEW APIs ================= */
 
-app.get("/fix-db", async (req, res) => {
+// 1. Add a Performance Review
+app.post("/add-review", async (req, res) => {
   try {
-    await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS otp VARCHAR(6)`);
-    // Ensure tasks table exists if manual fix is called
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        task_id SERIAL PRIMARY KEY,
-        task_title VARCHAR(255) NOT NULL,
-        task_description TEXT,
-        priority VARCHAR(20), 
-        assigned_to INT REFERENCES employees(emp_id),
-        start_date DATE,
-        end_date DATE,
-        task_type VARCHAR(20), 
-        status VARCHAR(20) DEFAULT 'Pending',
-        is_deleted BOOLEAN DEFAULT FALSE
-      )
-    `);
-    res.send("✅ DB Migration & Task Table Check Completed");
+    const { review_title, emp_id, review_date, review_period, rating, comment } = req.body;
+    await pool.query(
+      `INSERT INTO reviews (review_title, emp_id, review_date, review_period, rating, comment)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [review_title, emp_id, review_date, review_period, rating, comment]
+    );
+    res.send("Review Added Successfully");
   } catch (err) {
     console.error(err);
     res.status(500).json(err.message);
   }
 });
 
-/* ================= OTP APIs ================= */
-
-app.post("/send-otp", async (req, res) => {
+// 2. Get All Reviews (For Dashboard Table)
+app.get("/reviews", async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).send("Email required");
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    const result = await pool.query(
-      "UPDATE employees SET otp = $1 WHERE email = $2 RETURNING *",
-      [otp, email]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).send("Email not found in Employee records");
-    }
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "OTP for Password Reset",
-      text: `Your OTP is ${otp}`,
-    });
-
-    res.send("OTP sent to email");
-  } catch (err) {
-    console.error("EMAIL ERROR:", err);
-    res.status(500).send("Error sending OTP");
-  }
-});
-
-app.post("/reset-password", async (req, res) => {
-  try {
-    const { email, otp, new_password } = req.body;
-
-    const result = await pool.query(
-      "SELECT * FROM employees WHERE email = $1 AND otp = $2",
-      [email, otp]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(400).send("Invalid OTP");
-    }
-
-    await pool.query("UPDATE employees SET otp = NULL WHERE email = $1", [email]);
-    res.send("Password reset successful");
+    const result = await pool.query(`
+      SELECT r.*, e.emp_name 
+      FROM reviews r
+      JOIN employees e ON r.emp_id = e.emp_id
+      WHERE r.is_deleted = FALSE
+      ORDER BY r.review_date DESC
+    `);
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json(err.message);
   }
 });
 
-/* ================= TASK MANAGEMENT APIs (New) ================= */
+/* ================= TASK MANAGEMENT APIs ================= */
 
-// 1. Create a Task
 app.post("/add-task", async (req, res) => {
   try {
     const { task_title, task_description, priority, assigned_to, start_date, end_date, task_type } = req.body;
@@ -199,18 +166,18 @@ app.post("/add-task", async (req, res) => {
     );
     res.send("Task Created Successfully");
   } catch (err) {
-    console.error(err);
     res.status(500).json(err.message);
   }
 });
 
-// 2. Get All Tasks with Employee Name
 app.get("/tasks", async (req, res) => {
   try {
+    // Modified to include Review data for the dashboard stats
     const result = await pool.query(`
-      SELECT t.*, e.emp_name 
+      SELECT t.*, e.emp_name, r.review_period, r.rating
       FROM tasks t
       LEFT JOIN employees e ON t.assigned_to = e.emp_id
+      LEFT JOIN reviews r ON e.emp_id = r.emp_id
       WHERE t.is_deleted = FALSE
       ORDER BY t.task_id DESC
     `);
@@ -220,34 +187,25 @@ app.get("/tasks", async (req, res) => {
   }
 });
 
-// 3. Update Task Status (e.g., Mark Completed)
-app.put("/update-task-status/:id", async (req, res) => {
-  try {
-    const { status } = req.body; 
-    await pool.query(
-      "UPDATE tasks SET status = $1 WHERE task_id = $2",
-      [status, req.params.id]
-    );
-    res.send("Task Status Updated");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-// 4. Delete Task (Soft Delete)
 app.delete("/delete-task/:id", async (req, res) => {
   try {
-    await pool.query(
-      "UPDATE tasks SET is_deleted = TRUE WHERE task_id = $1",
-      [req.params.id]
-    );
-    res.send("Task Deleted Successfully");
+    await pool.query("UPDATE tasks SET is_deleted = TRUE WHERE task_id = $1", [req.params.id]);
+    res.send("Task Deleted");
   } catch (err) {
     res.status(500).json(err.message);
   }
 });
 
-/* ================= DEPARTMENTS ================= */
+/* ================= EMPLOYEES, ROLES, DEPT (Existing) ================= */
+
+app.get("/employees", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM employees WHERE is_deleted = FALSE");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+});
 
 app.get("/departments", async (req, res) => {
   try {
@@ -258,27 +216,6 @@ app.get("/departments", async (req, res) => {
   }
 });
 
-app.post("/add-department", async (req, res) => {
-  try {
-    const { dept_name, description } = req.body;
-    await pool.query("INSERT INTO departments (dept_name, description) VALUES ($1,$2)", [dept_name, description]);
-    res.send("Department Added");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-app.delete("/delete-department/:id", async (req, res) => {
-  try {
-    await pool.query("UPDATE departments SET is_deleted = TRUE WHERE dept_id=$1", [req.params.id]);
-    res.send("Department Deleted");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-/* ================= ROLES ================= */
-
 app.get("/roles", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM roles WHERE is_deleted = FALSE");
@@ -288,55 +225,24 @@ app.get("/roles", async (req, res) => {
   }
 });
 
-app.post("/add-role", async (req, res) => {
-  try {
-    const { role_name, description } = req.body;
-    await pool.query("INSERT INTO roles (role_name, description) VALUES ($1,$2)", [role_name, description]);
-    res.send("Role Added");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
+/* ================= OTP APIs ================= */
 
-/* ================= EMPLOYEES ================= */
-
-app.get("/employees", async (req, res) => {
+app.post("/send-otp", async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT e.*, r.role_name, d.dept_name, m.emp_name AS manager_name
-      FROM employees e
-      LEFT JOIN roles r ON e.role_id = r.role_id
-      LEFT JOIN departments d ON e.dept_id = d.dept_id
-      LEFT JOIN employees m ON e.manager_id = m.emp_id
-      WHERE e.is_deleted = FALSE
-      ORDER BY e.emp_id DESC
-    `);
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
+    const { email } = req.body;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const result = await pool.query("UPDATE employees SET otp = $1 WHERE email = $2 RETURNING *", [otp, email]);
+    if (result.rows.length === 0) return res.status(404).send("Email not found");
 
-app.post("/add-employee", async (req, res) => {
-  try {
-    const { emp_name, email, phone, address, region, role_id, dept_id, manager_id } = req.body;
-    await pool.query(
-      `INSERT INTO employees (emp_name, email, phone, address, region, role_id, dept_id, manager_id)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [emp_name, email, phone, address, region, role_id, dept_id, manager_id]
-    );
-    res.send("Employee Added");
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "OTP for Password Reset",
+      text: `Your OTP is ${otp}`,
+    });
+    res.send("OTP sent");
   } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
-app.delete("/delete-employee/:id", async (req, res) => {
-  try {
-    await pool.query("UPDATE employees SET is_deleted = TRUE WHERE emp_id=$1", [req.params.id]);
-    res.send("Employee Deleted");
-  } catch (err) {
-    res.status(500).json(err.message);
+    res.status(500).send("Error");
   }
 });
 

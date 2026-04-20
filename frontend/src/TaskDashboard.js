@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const TaskDashboard = () => {
   const [tasks, setTasks] = useState([]);
-  const [filterStatus, setFilterStatus] = useState('All'); // Now being used correctly
+  const [filterStatus, setFilterStatus] = useState('All');
 
   useEffect(() => {
     fetchTasks();
@@ -30,7 +30,7 @@ const TaskDashboard = () => {
   const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
   const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
 
-  // FILTER LOGIC - Fixed the 'unused variable' error here
+  // FILTER LOGIC
   const filteredTasks = filterStatus === 'All' 
     ? tasks 
     : tasks.filter(t => t.status === filterStatus);
@@ -39,7 +39,7 @@ const TaskDashboard = () => {
     <div className="container mt-4">
       <h2 className="mb-4">Task Management Dashboard</h2>
 
-      {/* STATISTICS BOXES */}
+      {/* PRIMARY STATISTICS BOXES */}
       <div className="row mb-4 text-white text-center">
         <div className="col-md-3"><div className="bg-primary p-3 rounded shadow"><h5>Total</h5><h3>{totalTasks}</h3></div></div>
         <div className="col-md-3"><div className="bg-success p-3 rounded shadow"><h5>Completed</h5><h3>{completedTasks}</h3></div></div>
@@ -49,12 +49,12 @@ const TaskDashboard = () => {
 
       {/* FILTER DROPDOWN */}
       <div className="row mb-3 p-3 bg-light rounded shadow-sm">
-        <div className="col-md-4">
+        <div className="col-md-4 text-start">
           <label className="fw-bold">Filter By Status:</label>
           <select 
             className="form-select" 
             value={filterStatus} 
-            onChange={(e) => setFilterStatus(e.target.value)} // setFilterStatus is now used
+            onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="All">All Statuses</option>
             <option value="Pending">Pending</option>
@@ -65,7 +65,7 @@ const TaskDashboard = () => {
       </div>
 
       {/* TASK TABLE */}
-      <div className="table-responsive">
+      <div className="table-responsive mb-5">
         <table className="table table-hover shadow-sm border">
           <thead className="table-dark">
             <tr>
@@ -91,6 +91,29 @@ const TaskDashboard = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* PERFORMANCE REVIEW STATISTICS */}
+      <div className="card shadow p-4 bg-light">
+        <h4 className="mb-4 text-start border-bottom pb-2">Performance Statistics</h4>
+        <div className="row text-start">
+          <div className="col-md-6 border-end">
+            <p className="fw-bold text-primary">Period Wise Number of Review</p>
+            <ul className="list-group list-group-flush">
+              <li className="list-group-item d-flex justify-content-between align-items-center">Monthly <span>{tasks.filter(t => t.review_period === 'Monthly').length}</span></li>
+              <li className="list-group-item d-flex justify-content-between align-items-center">Quarterly <span>{tasks.filter(t => t.review_period === 'Quarterly').length}</span></li>
+              <li className="list-group-item d-flex justify-content-between align-items-center">Annually <span>{tasks.filter(t => t.review_period === 'Annual').length}</span></li>
+            </ul>
+          </div>
+          <div className="col-md-6">
+            <p className="fw-bold text-primary">Rating Vs Total Number of Employees</p>
+            <ul className="list-group list-group-flush">
+              <li className="list-group-item d-flex justify-content-between align-items-center">Between 1-5 <span>{tasks.filter(t => t.rating >= 1 && t.rating <= 5).length}</span></li>
+              <li className="list-group-item d-flex justify-content-between align-items-center">Between 6-8 <span>{tasks.filter(t => t.rating >= 6 && t.rating <= 8).length}</span></li>
+              <li className="list-group-item d-flex justify-content-between align-items-center">Above 9 <span>{tasks.filter(t => t.rating >= 9).length}</span></li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

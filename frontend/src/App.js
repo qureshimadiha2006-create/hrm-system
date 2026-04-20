@@ -40,6 +40,7 @@ function App() {
           <button className={`btn btn-sm mx-1 ${page === "role" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("role")}>Role</button>
           <button className={`btn btn-sm mx-1 ${page === "create-task" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("create-task")}>Create Task</button>
           <button className={`btn btn-sm mx-1 ${page === "task-dashboard" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("task-dashboard")}>Task Dashboard</button>
+         <button className={`btn btn-sm mx-1 ${page === "add-review" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("add-review")}>Add Review</button>
           <button
             className="btn btn-sm btn-danger ms-3"
             onClick={() => {
@@ -64,6 +65,7 @@ function App() {
         )}
         
         {page === "task-dashboard" && <TaskDashboard />}
+        {page === "add-review" && <AddReview goBack={() => setPage("task-dashboard")} />}
       </div>
     </div>
   );
