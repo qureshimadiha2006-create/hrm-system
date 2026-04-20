@@ -1,3 +1,4 @@
+import AddReview from "./AddReview";
 import React, { useState } from "react";
 import Department from "./Department";
 import Employee from "./Employee";
