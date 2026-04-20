@@ -24,7 +24,7 @@ const CreateTask = ({ goBack }) => {
     try {
       await axios.post('https://hrm-system-madiha.onrender.com/add-task', formData);
       alert("Task Created Successfully!");
-      if (goBack) goBack(); // Redirects to Dashboard
+      if (goBack) goBack(); 
     } catch (err) {
       alert("Error creating task");
     }

@@ -11,7 +11,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [page, setPage] = useState("login");
 
-  // NOT LOGGED IN FLOW
+  // --- LOGIN FLOW ---
   if (!isLoggedIn) {
     if (page === "forgot") {
       return <ForgotPassword goBack={() => setPage("login")} />;
@@ -19,38 +19,52 @@ function App() {
 
     return (
       <Login
-        onLogin={() => setIsLoggedIn(true)}
+        onLogin={() => {
+          setIsLoggedIn(true);
+          setPage("task-dashboard"); // Redirect to dashboard immediately after login
+        }}
         goToForgot={() => setPage("forgot")}
       />
     );
   }
 
-  // AFTER LOGIN
+  // --- MAIN APP (LOGGED IN) ---
   return (
-    <div style={{ textAlign: "center" }}>
-      <h1>HRM System</h1>
+    <div className="container-fluid p-0">
+      {/* Navigation Header */}
+      <nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4 px-3 shadow">
+        <span className="navbar-brand fw-bold">HRM System</span>
+        <div className="navbar-nav ms-auto">
+          <button className={`btn btn-sm mx-1 ${page === "department" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("department")}>Department</button>
+          <button className={`btn btn-sm mx-1 ${page === "employee" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("employee")}>Employee</button>
+          <button className={`btn btn-sm mx-1 ${page === "role" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("role")}>Role</button>
+          <button className={`btn btn-sm mx-1 ${page === "create-task" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("create-task")}>Create Task</button>
+          <button className={`btn btn-sm mx-1 ${page === "task-dashboard" ? "btn-light" : "btn-outline-light"}`} onClick={() => setPage("task-dashboard")}>Task Dashboard</button>
+          <button
+            className="btn btn-sm btn-danger ms-3"
+            onClick={() => {
+              setIsLoggedIn(false);
+              setPage("login");
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </nav>
 
-      <div style={{ marginBottom: "20px" }}>
-        <button onClick={() => setPage("department")}>Department</button>
-        <button onClick={() => setPage("employee")}>Employee</button>
-        <button onClick={() => setPage("role")}>Role</button>
-        <button onClick={() => setPage("create-task")}>Create Task</button>
-        <button onClick={() => setPage("task-dashboard")}>Task Dashboard</button>
-        <button
-          onClick={() => {
-            setIsLoggedIn(false);
-            setPage("login");
-          }}
-        >
-          Logout
-        </button>
+      {/* Main Content Area */}
+      <div className="container text-center">
+        {page === "department" && <Department />}
+        {page === "employee" && <Employee />}
+        {page === "role" && <Role />}
+        
+        {/* Pass goBack prop to CreateTask to satisfy its requirements */}
+        {page === "create-task" && (
+          <CreateTask goBack={() => setPage("task-dashboard")} />
+        )}
+        
+        {page === "task-dashboard" && <TaskDashboard />}
       </div>
-
-      {page === "department" && <Department />}
-      {page === "employee" && <Employee />}
-      {page === "role" && <Role />}
-      {page === "create-task" && <CreateTask />}
-      {page === "task-dashboard" && <TaskDashboard />}
     </div>
   );
 }
