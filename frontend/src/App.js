@@ -4,6 +4,8 @@ import Employee from "./Employee";
 import Role from "./Role";
 import Login from "./Login";
 import ForgotPassword from "./ForgotPassword";
+import CreateTask from "./CreateTask"; 
+import TaskDashboard from "./TaskDashboard";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -32,6 +34,8 @@ function App() {
         <button onClick={() => setPage("department")}>Department</button>
         <button onClick={() => setPage("employee")}>Employee</button>
         <button onClick={() => setPage("role")}>Role</button>
+        <button onClick={() => setPage("create-task")}>Create Task</button>
+        <button onClick={() => setPage("task-dashboard")}>Task Dashboard</button>
         <button
           onClick={() => {
             setIsLoggedIn(false);
@@ -45,6 +49,8 @@ function App() {
       {page === "department" && <Department />}
       {page === "employee" && <Employee />}
       {page === "role" && <Role />}
+      {page === "create-task" && <CreateTask />}
+      {page === "task-dashboard" && <TaskDashboard />}
     </div>
   );
 }
