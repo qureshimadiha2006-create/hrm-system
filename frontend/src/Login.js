@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-function Login({ onLogin }) {
+function Login({ onLogin, goToForgot }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -19,6 +19,7 @@ function Login({ onLogin }) {
 
       <input
         placeholder="Username"
+        value={username}
         onChange={(e) => setUsername(e.target.value)}
       />
       <br /><br />
@@ -26,11 +27,22 @@ function Login({ onLogin }) {
       <input
         type="password"
         placeholder="Password"
+        value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
       <br /><br />
 
       <button onClick={handleLogin}>Login</button>
+
+      <br /><br />
+
+      {/* FORGOT PASSWORD LINK */}
+      <p
+  onClick={() => goToForgot && goToForgot()}
+  style={{ color: "blue", cursor: "pointer" }}
+>
+  Forgot Password?
+</p>
     </div>
   );
 }
