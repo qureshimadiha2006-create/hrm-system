@@ -4,10 +4,14 @@ console.log("🔥 HRM SERVER STARTING...");
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
+const nodemailer = require("nodemailer"); // ✅ NEW
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ✅ OTP STORE (TEMP)
+const otpStore = {};
 
 /* ================= DATABASE ================= */
 
@@ -21,6 +25,16 @@ const pool = new Pool({
 pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
   .catch(err => console.error("❌ DB Error:", err));
+
+/* ================= EMAIL SETUP ================= */
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 /* ================= INIT TABLES ================= */
 
@@ -73,7 +87,7 @@ app.get("/", (req, res) => {
   res.send("🚀 HRM Backend Running Successfully");
 });
 
-/* ================= FIX DB (RUN ONCE) ================= */
+/* ================= FIX DB ================= */
 
 app.get("/fix-db", async (req, res) => {
   try {
@@ -84,6 +98,49 @@ app.get("/fix-db", async (req, res) => {
     res.send("✅ DB Migration Completed");
   } catch (err) {
     console.error(err);
+    res.status(500).json(err.message);
+  }
+});
+
+/* ================= OTP APIs ================= */
+
+app.post("/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) return res.status(400).send("Email required");
+
+    const otp = Math.floor(100000 + Math.random() * 900000);
+
+    otpStore[email] = otp;
+
+    // ✅ SEND EMAIL
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "OTP for Password Reset",
+      text: `Your OTP is ${otp}`,
+    });
+
+    res.send("OTP sent to email");
+  } catch (err) {
+    console.error("EMAIL ERROR:", err);
+    res.status(500).send("Error sending OTP");
+  }
+});
+
+app.post("/reset-password", async (req, res) => {
+  try {
+    const { email, otp, new_password } = req.body;
+
+    if (otpStore[email] != otp) {
+      return res.status(400).send("Invalid OTP");
+    }
+
+    delete otpStore[email];
+
+    res.send("Password reset successful");
+  } catch (err) {
     res.status(500).json(err.message);
   }
 });
