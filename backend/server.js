@@ -4,14 +4,11 @@ console.log("🔥 HRM SERVER STARTING...");
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
-const nodemailer = require("nodemailer"); // ✅ NEW
+const nodemailer = require("nodemailer");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// ✅ OTP STORE (TEMP)
-const otpStore = {};
 
 /* ================= DATABASE ================= */
 
@@ -62,7 +59,7 @@ const initDB = async () => {
       CREATE TABLE IF NOT EXISTS employees (
         emp_id SERIAL PRIMARY KEY,
         emp_name VARCHAR(100),
-        email VARCHAR(100),
+        email VARCHAR(100) UNIQUE,
         phone VARCHAR(20),
         address TEXT,
         region VARCHAR(50),
@@ -73,7 +70,10 @@ const initDB = async () => {
       )
     `);
 
-    console.log("✅ Tables Ready");
+    // ✅ AUTOMATIC DATABASE FIX: Adds the OTP column if Render dashboard blocks you
+    await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS otp VARCHAR(6)`);
+
+    console.log("✅ Tables Ready & Database Verified");
   } catch (err) {
     console.error("❌ Init DB Error:", err);
   }
@@ -94,6 +94,7 @@ app.get("/fix-db", async (req, res) => {
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`);
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS address TEXT`);
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS region VARCHAR(50)`);
+    await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS otp VARCHAR(6)`);
 
     res.send("✅ DB Migration Completed");
   } catch (err) {
@@ -107,12 +108,19 @@ app.get("/fix-db", async (req, res) => {
 app.post("/send-otp", async (req, res) => {
   try {
     const { email } = req.body;
-
     if (!email) return res.status(400).send("Email required");
 
-    const otp = Math.floor(100000 + Math.random() * 900000);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    otpStore[email] = otp;
+    // ✅ SAVE OTP TO DATABASE (Ensures it works on Render Free Tier)
+    const result = await pool.query(
+      "UPDATE employees SET otp = $1 WHERE email = $2 RETURNING *",
+      [otp, email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("Email not found in Employee records");
+    }
 
     // ✅ SEND EMAIL
     await transporter.sendMail({
@@ -133,11 +141,18 @@ app.post("/reset-password", async (req, res) => {
   try {
     const { email, otp, new_password } = req.body;
 
-    if (otpStore[email] != otp) {
+    // ✅ VERIFY OTP FROM DATABASE
+    const result = await pool.query(
+      "SELECT * FROM employees WHERE email = $1 AND otp = $2",
+      [email, otp]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(400).send("Invalid OTP");
     }
 
-    delete otpStore[email];
+    // Clear OTP after use
+    await pool.query("UPDATE employees SET otp = NULL WHERE email = $1", [email]);
 
     res.send("Password reset successful");
   } catch (err) {
@@ -172,12 +187,10 @@ app.get("/deleted-departments", async (req, res) => {
 app.post("/add-department", async (req, res) => {
   try {
     const { dept_name, description } = req.body;
-
     await pool.query(
       "INSERT INTO departments (dept_name, description) VALUES ($1,$2)",
       [dept_name, description]
     );
-
     res.send("Department Added");
   } catch (err) {
     res.status(500).json(err.message);
@@ -190,7 +203,6 @@ app.delete("/delete-department/:id", async (req, res) => {
       "UPDATE departments SET is_deleted = TRUE WHERE dept_id=$1",
       [req.params.id]
     );
-
     res.send("Department Deleted");
   } catch (err) {
     res.status(500).json(err.message);
@@ -213,12 +225,10 @@ app.get("/roles", async (req, res) => {
 app.post("/add-role", async (req, res) => {
   try {
     const { role_name, description } = req.body;
-
     await pool.query(
       "INSERT INTO roles (role_name, description) VALUES ($1,$2)",
       [role_name, description]
     );
-
     res.send("Role Added");
   } catch (err) {
     res.status(500).json(err.message);
@@ -231,17 +241,8 @@ app.get("/employees", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        e.emp_id,
-        e.emp_name,
-        e.email,
-        e.phone,
-        e.address,
-        e.region,
-        e.role_id,
-        e.dept_id,
-        e.manager_id,
-        r.role_name,
-        d.dept_name,
+        e.emp_id, e.emp_name, e.email, e.phone, e.address, e.region,
+        e.role_id, e.dept_id, e.manager_id, r.role_name, d.dept_name,
         m.emp_name AS manager_name
       FROM employees e
       LEFT JOIN roles r ON e.role_id = r.role_id
@@ -250,7 +251,6 @@ app.get("/employees", async (req, res) => {
       WHERE e.is_deleted = FALSE
       ORDER BY e.emp_id DESC
     `);
-
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -260,33 +260,13 @@ app.get("/employees", async (req, res) => {
 
 app.post("/add-employee", async (req, res) => {
   try {
-    const {
-      emp_name,
-      email,
-      phone,
-      address,
-      region,
-      role_id,
-      dept_id,
-      manager_id
-    } = req.body;
-
+    const { emp_name, email, phone, address, region, role_id, dept_id, manager_id } = req.body;
     await pool.query(
       `INSERT INTO employees 
       (emp_name, email, phone, address, region, role_id, dept_id, manager_id)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [
-        emp_name,
-        email,
-        phone || null,
-        address || null,
-        region || null,
-        role_id || null,
-        dept_id || null,
-        manager_id || null
-      ]
+      [emp_name, email, phone || null, address || null, region || null, role_id || null, dept_id || null, manager_id || null]
     );
-
     res.send("Employee Added");
   } catch (err) {
     console.error(err);
@@ -296,41 +276,13 @@ app.post("/add-employee", async (req, res) => {
 
 app.put("/update-employee/:id", async (req, res) => {
   try {
-    const {
-      emp_name,
-      email,
-      phone,
-      address,
-      region,
-      role_id,
-      dept_id,
-      manager_id
-    } = req.body;
-
+    const { emp_name, email, phone, address, region, role_id, dept_id, manager_id } = req.body;
     await pool.query(
       `UPDATE employees 
-       SET emp_name=$1,
-           email=$2,
-           phone=$3,
-           address=$4,
-           region=$5,
-           role_id=$6,
-           dept_id=$7,
-           manager_id=$8
+       SET emp_name=$1, email=$2, phone=$3, address=$4, region=$5, role_id=$6, dept_id=$7, manager_id=$8
        WHERE emp_id=$9`,
-      [
-        emp_name,
-        email,
-        phone,
-        address,
-        region,
-        role_id,
-        dept_id,
-        manager_id || null,
-        req.params.id
-      ]
+      [emp_name, email, phone, address, region, role_id, dept_id, manager_id || null, req.params.id]
     );
-
     res.send("Employee Updated");
   } catch (err) {
     console.error(err);
@@ -344,13 +296,12 @@ app.delete("/delete-employee/:id", async (req, res) => {
       "UPDATE employees SET is_deleted = TRUE WHERE emp_id=$1",
       [req.params.id]
     );
-
     res.send("Employee Deleted");
   } catch (err) {
     res.status(500).json(err.message);
   }
 });
-
+ 
 /* ================= SERVER ================= */
 
 const PORT = process.env.PORT || 5000;

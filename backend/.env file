@@ -1,2 +1,8 @@
-EMAIL=qureshimaiha@gmail.com
-EMAIL_PASS=tgkz ldmq dnnu httm
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'qureshimaiha@gmail.com', // Added quotes
+    pass: 'tgkzldmqdnnuhttm'       // Added quotes AND removed spaces
+  }
+});
+
