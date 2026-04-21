@@ -155,6 +155,72 @@ app.get("/setup-test-data", async (req, res) => {
     res.status(500).send("Error creating data: " + err.message);
   }
 });
-/* ================= 5. SERVER START ================= */
+/* ================= PERFORMANCE MANAGEMENT ROUTES ================= */
+
+app.post("/add-review", async (req, res) => {
+  try {
+    const { emp_id, rating, review_comment, review_date, review_period } = req.body;
+    await pool.query(
+      "INSERT INTO reviews (emp_id, rating, review_comment, review_date, review_period) VALUES ($1, $2, $3, $4, $5)",
+      [emp_id, rating, review_comment, review_date, review_period]
+    );
+    res.status(201).send("✅ Review added successfully");
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error: " + err.message);
+  }
+});
+
+/* ================= TASK MANAGEMENT ROUTES ================= */
+
+app.post("/add-task", async (req, res) => {
+  try {
+    const { task_title, task_description, priority, assigned_to, start_date, end_date, task_type } = req.body;
+    await pool.query(
+      "INSERT INTO tasks (title, description, priority, assigned_to, start_date, end_date, type) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [task_title, task_description, priority, assigned_to, start_date, end_date, task_type]
+    );
+    res.status(201).send("✅ Task created successfully");
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error: " + err.message);
+  }
+});
+// TEMPORARY: VISIT /create-tables TO SETUP YOUR DATABASE
+app.get("/create-tables", async (req, res) => {
+  try {
+    // Create Reviews Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reviews (
+        review_id SERIAL PRIMARY KEY,
+        emp_id INT REFERENCES employees(emp_id),
+        review_title VARCHAR(255),
+        rating INT,
+        review_comment TEXT,
+        review_date DATE,
+        review_period VARCHAR(50)
+      );
+    `);
+
+    // Create Tasks Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        task_id SERIAL PRIMARY KEY,
+        title VARCHAR(255),
+        description TEXT,
+        priority VARCHAR(50),
+        assigned_to INT REFERENCES employees(emp_id),
+        start_date DATE,
+        end_date DATE,
+        type VARCHAR(50)
+      );
+    `);
+
+    res.send("<h1>✅ Tables Created Successfully!</h1><p>Reviews and Tasks tables are now ready.</p>");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error creating tables: " + err.message);
+  }
+});
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server live on port ${PORT}`));

@@ -14,9 +14,12 @@ const CreateTask = ({ goBack }) => {
     task_type: 'Individual'
   });
 
+  // Centralized URL
+  const BASE_URL = 'https://hrm-system-madiha.onrender.com';
+
   useEffect(() => {
     let isMounted = true;
-    axios.get('https://hrm-system-madiha.onrender.com/employees')
+    axios.get(`${BASE_URL}/employees`)
       .then(res => {
         if(isMounted) setEmployees(res.data);
       })
@@ -28,13 +31,20 @@ const CreateTask = ({ goBack }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    // LOGIC CHANGE: Ensure 'assigned_to' is an Integer for the database
+    const payload = {
+      ...formData,
+      assigned_to: parseInt(formData.assigned_to)
+    };
+
     try {
-      await axios.post('https://hrm-system-madiha.onrender.com/add-task', formData);
-      alert("Task Created Successfully!");
+      await axios.post(`${BASE_URL}/add-task`, payload);
+      alert("✅ Task Created Successfully!");
       if (goBack) goBack(); 
     } catch (err) {
       console.error(err);
-      alert("Error creating task. Please check if backend is running.");
+      alert("❌ Error creating task. Please check if the backend is running and the database table exists.");
     } finally {
       setLoading(false);
     }
@@ -42,7 +52,7 @@ const CreateTask = ({ goBack }) => {
 
   return (
     <div className="container mt-4" style={{ maxWidth: '600px' }}>
-      <div className="card shadow p-4 border-0">
+      <div className="card shadow p-4 border-0 bg-dark text-white">
         <h2 className="text-center mb-4 fw-bold text-primary">Task Creation</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-3 text-start">
@@ -72,7 +82,11 @@ const CreateTask = ({ goBack }) => {
           <div className="row">
             <div className="col-md-6 mb-3 text-start">
               <label className="fw-bold form-label">Priority:</label>
-              <select className="form-select" onChange={(e) => setFormData({...formData, priority: e.target.value})} value={formData.priority}>
+              <select 
+                className="form-select" 
+                onChange={(e) => setFormData({...formData, priority: e.target.value})} 
+                value={formData.priority}
+              >
                 <option value="High">High</option>
                 <option value="Medium">Medium</option>
                 <option value="Low">Low</option>
@@ -80,10 +94,18 @@ const CreateTask = ({ goBack }) => {
             </div>
             <div className="col-md-6 mb-3 text-start">
               <label className="fw-bold form-label">Assigned To:</label>
-              <select required className="form-select" value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})}>
+              <select 
+                required 
+                className="form-select" 
+                value={formData.assigned_to} 
+                onChange={(e) => setFormData({...formData, assigned_to: e.target.value})}
+              >
                 <option value="">Select Employee</option>
                 {employees.map(emp => (
-                  <option key={emp.emp_id} value={emp.emp_id}>{emp.emp_name}</option>
+                  // Using ID as value to ensure database compatibility
+                  <option key={emp.emp_id} value={emp.emp_id}>
+                    {emp.emp_name} (ID: {emp.emp_id})
+                  </option>
                 ))}
               </select>
             </div>
@@ -92,17 +114,33 @@ const CreateTask = ({ goBack }) => {
           <div className="row">
             <div className="col-md-6 mb-3 text-start">
               <label className="fw-bold form-label">Start Date:</label>
-              <input type="date" required className="form-control" onChange={(e) => setFormData({...formData, start_date: e.target.value})} />
+              <input 
+                type="date" 
+                required 
+                className="form-control" 
+                value={formData.start_date}
+                onChange={(e) => setFormData({...formData, start_date: e.target.value})} 
+              />
             </div>
             <div className="col-md-6 mb-3 text-start">
               <label className="fw-bold form-label">End Date:</label>
-              <input type="date" required className="form-control" onChange={(e) => setFormData({...formData, end_date: e.target.value})} />
+              <input 
+                type="date" 
+                required 
+                className="form-control" 
+                value={formData.end_date}
+                onChange={(e) => setFormData({...formData, end_date: e.target.value})} 
+              />
             </div>
           </div>
 
           <div className="mb-4 text-start">
             <label className="fw-bold form-label">Task Type:</label>
-            <select className="form-select" onChange={(e) => setFormData({...formData, task_type: e.target.value})} value={formData.task_type}>
+            <select 
+              className="form-select" 
+              onChange={(e) => setFormData({...formData, task_type: e.target.value})} 
+              value={formData.task_type}
+            >
               <option value="Individual">Individual</option>
               <option value="Team">Team</option>
             </select>
@@ -112,7 +150,7 @@ const CreateTask = ({ goBack }) => {
             <button type="submit" className="btn btn-primary fw-bold" disabled={loading}>
               {loading ? "Creating..." : "Create Task"}
             </button>
-            <button type="button" className="btn btn-outline-secondary" onClick={goBack}>Cancel</button>
+            <button type="button" className="btn btn-outline-light" onClick={goBack}>Cancel</button>
           </div>
         </form>
       </div>
