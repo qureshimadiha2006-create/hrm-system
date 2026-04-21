@@ -13,7 +13,7 @@ const LeaveManagement = () => {
   const [formData, setFormData] = useState({ type: "PL", reason: "", from: "", to: "" });
 
   // This email MUST exist in your database for the apply to work
-  const currentEmpEmail = "madihaqureshimadiha2006@gmail.com"; 
+  const currentEmpEmail ="qureshimadiha2006@gmail.com"; 
 
   useEffect(() => {
     fetchLeaveData();
