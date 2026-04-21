@@ -101,31 +101,36 @@ app.put("/restore-employee/:id", async (req, res) => {
   res.send("Employee restored");
 });
 
-/* ================= 4. LEAVE MANAGEMENT (Email-Based) ================= */
+//* ================= LEAVE MANAGEMENT (ID ONLY) ================= */
 
-app.get("/leaves", async (req, res) => {
+// 1. Get Quota and History by ID
+app.get("/leaves/:id", async (req, res) => {
   try {
-    const { email } = req.query;
-    const emp = await pool.query("SELECT emp_id FROM employees WHERE email = $1", [email]);
-    if (emp.rows.length === 0) return res.status(404).send("Employee not found");
-    const emp_id = emp.rows[0].emp_id;
+    const emp_id = req.params.id; // Takes the ID from the URL (e.g., /leaves/1)
     const quota = await pool.query("SELECT * FROM leave_quota WHERE emp_id = $1", [emp_id]);
     const history = await pool.query("SELECT * FROM leaves WHERE emp_id = $1 ORDER BY applied_at DESC", [emp_id]);
-    res.json({ quota: quota.rows[0], history: history.rows });
-  } catch (err) { res.status(500).json(err.message); }
+    
+    res.json({ 
+      quota: quota.rows[0] || { sl_quota: 0, pl_quota: 0, cl_quota: 0 }, 
+      history: history.rows 
+    });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
+// 2. Apply for Leave by ID
 app.post("/leaves/apply", async (req, res) => {
   try {
-    const { email, type, reason, from, to } = req.body;
-    const emp = await pool.query("SELECT emp_id FROM employees WHERE email = $1", [email]);
-    if (emp.rows.length === 0) return res.status(404).send("Employee not found");
+    const { emp_id, type, reason, from, to } = req.body;
     await pool.query(
       "INSERT INTO leaves (emp_id, leave_type, reason, from_date, to_date) VALUES ($1, $2, $3, $4, $5)",
-      [emp.rows[0].emp_id, type, reason, from, to]
+      [emp_id, type, reason, from, to]
     );
-    res.json({ message: "Leave applied successfully" });
-  } catch (err) { res.status(500).json(err.message); }
+    res.send("Leave applied successfully");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 /* ================= 5. SERVER START ================= */
