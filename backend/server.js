@@ -155,11 +155,6 @@ app.get("/setup-test-data", async (req, res) => {
     res.status(500).send("Error creating data: " + err.message);
   }
 });
-
-// --- THIS IS ALWAYS AT THE VERY BOTTOM ---
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server live on port ${PORT}`));
-
 /* ================= 5. SERVER START ================= */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server live on port ${PORT}`));
