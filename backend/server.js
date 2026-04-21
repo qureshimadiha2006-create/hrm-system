@@ -153,40 +153,39 @@ app.get("/", (req, res) => {
   res.send("🚀 HRM Backend Running Successfully");
 });
 
-/* ================= LEAVE MANAGEMENT APIs ================= */
+/* ================= UPDATED LEAVE MANAGEMENT APIs (Email Sync) ================= */
 
-// Set or Update Leave Quota (Works with emp_id)
-app.post("/leaves/quota", async (req, res) => {
+// 1. Get balance and history using EMAIL instead of ID
+app.get("/leaves", async (req, res) => {
   try {
-    const { emp_id, sl_quota, pl_quota, cl_quota } = req.body;
-    await pool.query(
-      `INSERT INTO leave_quota (emp_id, sl_quota, pl_quota, cl_quota)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (emp_id) DO UPDATE 
-       SET sl_quota = $2, pl_quota = $3, cl_quota = $4`,
-      [emp_id, sl_quota, pl_quota, cl_quota]
-    );
-    res.send("Quota Updated Successfully");
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-} );
+    const { email } = req.query;
+    // Step 1: Find the internal ID using the email
+    const empResult = await pool.query("SELECT emp_id FROM employees WHERE email = $1", [email]);
+    
+    if (empResult.rows.length === 0) return res.status(404).send("Employee not found");
+    const emp_id = empResult.rows[0].emp_id;
 
-// Get balance and history using Employee ID
-app.get("/leaves/:empId", async (req, res) => {
-  try {
-    const quota = await pool.query("SELECT * FROM leave_quota WHERE emp_id = $1", [req.params.empId]);
-    const history = await pool.query("SELECT * FROM leaves WHERE emp_id = $1 ORDER BY applied_at DESC", [req.params.empId]);
+    // Step 2: Get quota and history using that ID
+    const quota = await pool.query("SELECT * FROM leave_quota WHERE emp_id = $1", [emp_id]);
+    const history = await pool.query("SELECT * FROM leaves WHERE emp_id = $1 ORDER BY applied_at DESC", [emp_id]);
+    
     res.json({ quota: quota.rows[0], history: history.rows });
   } catch (err) {
     res.status(500).json(err.message);
   }
 });
 
-// Apply for leave
+// 2. Apply for leave using EMAIL
 app.post("/leaves/apply", async (req, res) => {
   try {
-    const { emp_id, type, reason, from, to } = req.body;
+    const { email, type, reason, from, to } = req.body;
+    
+    // Step 1: Find ID from email
+    const empResult = await pool.query("SELECT emp_id FROM employees WHERE email = $1", [email]);
+    if (empResult.rows.length === 0) return res.status(404).send("Employee not found");
+    const emp_id = empResult.rows[0].emp_id;
+
+    // Step 2: Insert leave request
     await pool.query(
       "INSERT INTO leaves (emp_id, leave_type, reason, from_date, to_date) VALUES ($1, $2, $3, $4, $5)",
       [emp_id, type, reason, from, to]
@@ -196,23 +195,6 @@ app.post("/leaves/apply", async (req, res) => {
     res.status(500).json(err.message);
   }
 });
-
-// Admin: Update status and deduct from quota
-app.put("/leaves/status", async (req, res) => {
-  try {
-    const { leave_id, status, emp_id, leave_type, days } = req.body;
-    await pool.query("UPDATE leaves SET status = $1 WHERE leave_id = $2", [status, leave_id]);
-    
-    if (status === 'Approved') {
-      const quotaField = leave_type.toLowerCase() + '_quota';
-      await pool.query(`UPDATE leave_quota SET ${quotaField} = ${quotaField} - $1 WHERE emp_id = $2`, [days, emp_id]);
-    }
-    res.json({ message: "Status updated" });
-  } catch (err) {
-    res.status(500).json(err.message);
-  }
-});
-
 /* ================= PERFORMANCE REVIEW APIs ================= */
 
 app.post("/add-review", async (req, res) => {

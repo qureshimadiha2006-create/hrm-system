@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 const LeaveManagement = () => {
-  // CHANGE THIS to your deployed backend URL (e.g., https://hrm-backend.onrender.com)
-  const API_BASE_URL = "https://hrm-system-madiha.onrender.com/"; 
+  const API_BASE_URL = "https://hrm-system-madiha.onrender.com"; 
 
   const [view, setView] = useState("dashboard");
   const [leaves, setLeaves] = useState([]);
@@ -14,7 +13,7 @@ const LeaveManagement = () => {
   const [quotaData, setQuotaData] = useState({ emp_email: "", pl: 0, cl: 0, sl: 0 });
 
   // Using email as a unique identifier since your table shows emails clearly
-  const currentEmpEmail = "madihaqureshimadiha2006@gmail.com"; 
+  const currentEmpEmail = "qureshimadiha2006@gmail.com"; 
 
   useEffect(() => {
     fetchLeaveData();
@@ -42,16 +41,18 @@ const LeaveManagement = () => {
   };
 
   const handleApplyLeave = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`${API_BASE_URL}/leaves/apply`, { ...formData, email: currentEmpEmail });
-      alert("Leave Application Submitted!");
-      setView("dashboard");
-      fetchLeaveData();
-    } catch (err) {
-      alert("Submit failed. Is the backend running?");
-    }
-  };
+  e.preventDefault();
+  try {
+    const response = await axios.post(`${API_BASE_URL}/leaves/apply`, { ...formData, email: currentEmpEmail });
+    alert("Leave Application Submitted!");
+    setView("dashboard");
+    fetchLeaveData();
+  } catch (err) {
+    // This will tell you if it's a 404 (User not found), 500 (Server crash), or Network Error
+    console.error("Full Error:", err);
+    alert(`Error: ${err.response?.data || "Network error / Server offline"}`);
+  }
+};
 
   return (
     <div className="container mt-4 text-white">
