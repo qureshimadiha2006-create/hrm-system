@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
+const nodemailer = require("nodemailer");
 
 const app = express();
 app.use(cors());
@@ -13,9 +14,15 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-/* ================= 1. DEPARTMENTS ================= */
+/* ================= 1. DEPARTMENTS (Fixed Delete/Restore) ================= */
+
 app.get("/departments", async (req, res) => {
   const result = await pool.query("SELECT * FROM departments WHERE is_deleted = FALSE ORDER BY dept_id ASC");
+  res.json(result.rows);
+});
+
+app.get("/deleted-departments", async (req, res) => {
+  const result = await pool.query("SELECT * FROM departments WHERE is_deleted = TRUE ORDER BY dept_id ASC");
   res.json(result.rows);
 });
 
@@ -25,9 +32,25 @@ app.post("/add-department", async (req, res) => {
   res.status(201).send("Department Added");
 });
 
-/* ================= 2. ROLES ================= */
+app.put("/delete-department/:id", async (req, res) => {
+  await pool.query("UPDATE departments SET is_deleted = TRUE WHERE dept_id = $1", [req.params.id]);
+  res.send("Department moved to trash");
+});
+
+app.put("/restore-department/:id", async (req, res) => {
+  await pool.query("UPDATE departments SET is_deleted = FALSE WHERE dept_id = $1", [req.params.id]);
+  res.send("Department restored");
+});
+
+/* ================= 2. ROLES (Fixed Delete/Restore) ================= */
+
 app.get("/roles", async (req, res) => {
   const result = await pool.query("SELECT * FROM roles WHERE is_deleted = FALSE ORDER BY role_id ASC");
+  res.json(result.rows);
+});
+
+app.get("/deleted-roles", async (req, res) => {
+  const result = await pool.query("SELECT * FROM roles WHERE is_deleted = TRUE ORDER BY role_id ASC");
   res.json(result.rows);
 });
 
@@ -37,9 +60,25 @@ app.post("/add-role", async (req, res) => {
   res.status(201).send("Role Added");
 });
 
-/* ================= 3. EMPLOYEES ================= */
+app.put("/delete-role/:id", async (req, res) => {
+  await pool.query("UPDATE roles SET is_deleted = TRUE WHERE role_id = $1", [req.params.id]);
+  res.send("Role moved to trash");
+});
+
+app.put("/restore-role/:id", async (req, res) => {
+  await pool.query("UPDATE roles SET is_deleted = FALSE WHERE role_id = $1", [req.params.id]);
+  res.send("Role restored");
+});
+
+/* ================= 3. EMPLOYEES (Fixed Delete/Restore) ================= */
+
 app.get("/employees", async (req, res) => {
   const result = await pool.query("SELECT * FROM employees WHERE is_deleted = FALSE ORDER BY emp_id ASC");
+  res.json(result.rows);
+});
+
+app.get("/deleted-employees", async (req, res) => {
+  const result = await pool.query("SELECT * FROM employees WHERE is_deleted = TRUE ORDER BY emp_id ASC");
   res.json(result.rows);
 });
 
@@ -52,19 +91,35 @@ app.post("/add-employee", async (req, res) => {
   res.status(201).send("Employee Added");
 });
 
-/* ================= LEAVE MANAGEMENT ================= */
+app.put("/delete-employee/:id", async (req, res) => {
+  await pool.query("UPDATE employees SET is_deleted = TRUE WHERE emp_id = $1", [req.params.id]);
+  res.send("Employee moved to trash");
+});
+
+app.put("/restore-employee/:id", async (req, res) => {
+  await pool.query("UPDATE employees SET is_deleted = FALSE WHERE emp_id = $1", [req.params.id]);
+  res.send("Employee restored");
+});
+
+//* ================= LEAVE MANAGEMENT (ID ONLY) ================= */
+
+// 1. Get Quota and History by ID
 app.get("/leaves/:id", async (req, res) => {
   try {
-    const emp_id = req.params.id;
+    const emp_id = req.params.id; // Takes the ID from the URL (e.g., /leaves/1)
     const quota = await pool.query("SELECT * FROM leave_quota WHERE emp_id = $1", [emp_id]);
     const history = await pool.query("SELECT * FROM leaves WHERE emp_id = $1 ORDER BY applied_at DESC", [emp_id]);
+    
     res.json({ 
       quota: quota.rows[0] || { sl_quota: 0, pl_quota: 0, cl_quota: 0 }, 
       history: history.rows 
     });
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
+// 2. Apply for Leave by ID
 app.post("/leaves/apply", async (req, res) => {
   try {
     const { emp_id, type, reason, from, to } = req.body;
@@ -73,42 +128,68 @@ app.post("/leaves/apply", async (req, res) => {
       [emp_id, type, reason, from, to]
     );
     res.send("Leave applied successfully");
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
+/* ... your existing routes like /employees, /leaves etc ... */
 
-/* ================= PERFORMANCE MANAGEMENT ================= */
+// --- PASTE THE TEMPORARY ROUTE HERE ---
+app.get("/setup-test-data", async (req, res) => {
+  try {
+    // 1. Give Employee ID 1 some quota
+    await pool.query(`
+      INSERT INTO leave_quota (emp_id, sl_quota, pl_quota, cl_quota, year) 
+      VALUES (1, 5, 12, 8, 2026) 
+      ON CONFLICT (emp_id) DO UPDATE SET sl_quota = 5, pl_quota = 12, cl_quota = 8;
+    `);
+    
+    // 2. Add a sample leave history entry
+    await pool.query(`
+      INSERT INTO leaves (emp_id, leave_type, reason, from_date, to_date, status) 
+      VALUES (1, 'PL', 'Reference Leave Entry', '2026-05-10', '2026-05-12', 'Approved');
+    `);
+    
+    res.send("✅ Test data created for ID 1! You can now delete this route.");
+  } catch (err) {
+    res.status(500).send("Error creating data: " + err.message);
+  }
+});
+/* ================= PERFORMANCE MANAGEMENT ROUTES ================= */
+
 app.post("/add-review", async (req, res) => {
   try {
-    const { emp_id, rating, review_comment, review_date, review_period, review_title } = req.body;
-    // FIX: Added review_title to the INSERT statement to match your frontend payload
+    const { emp_id, rating, review_comment, review_date, review_period } = req.body;
     await pool.query(
-      "INSERT INTO reviews (emp_id, rating, review_comment, review_date, review_period, review_title) VALUES ($1, $2, $3, $4, $5, $6)",
-      [emp_id, rating, review_comment, review_date, review_period, review_title]
+      "INSERT INTO reviews (emp_id, rating, review_comment, review_date, review_period) VALUES ($1, $2, $3, $4, $5)",
+      [emp_id, rating, review_comment, review_date, review_period]
     );
     res.status(201).send("✅ Review added successfully");
   } catch (err) {
+    console.error(err.message);
     res.status(500).send("Server Error: " + err.message);
   }
 });
 
-/* ================= TASK MANAGEMENT ================= */
+/* ================= TASK MANAGEMENT ROUTES ================= */
+
 app.post("/add-task", async (req, res) => {
   try {
     const { task_title, task_description, priority, assigned_to, start_date, end_date, task_type } = req.body;
-    // FIX: Column names must match the table created in /create-tables
     await pool.query(
       "INSERT INTO tasks (title, description, priority, assigned_to, start_date, end_date, type) VALUES ($1, $2, $3, $4, $5, $6, $7)",
       [task_title, task_description, priority, assigned_to, start_date, end_date, task_type]
     );
     res.status(201).send("✅ Task created successfully");
   } catch (err) {
+    console.error(err.message);
     res.status(500).send("Server Error: " + err.message);
   }
 });
-
-/* ================= DATABASE SETUP ROUTES ================= */
+// TEMPORARY: VISIT /create-tables TO SETUP YOUR DATABASE
 app.get("/create-tables", async (req, res) => {
   try {
+    // Create Reviews Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         review_id SERIAL PRIMARY KEY,
@@ -119,6 +200,10 @@ app.get("/create-tables", async (req, res) => {
         review_date DATE,
         review_period VARCHAR(50)
       );
+    `);
+
+    // Create Tasks Table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS tasks (
         task_id SERIAL PRIMARY KEY,
         title VARCHAR(255),
@@ -130,20 +215,12 @@ app.get("/create-tables", async (req, res) => {
         type VARCHAR(50)
       );
     `);
-    res.send("<h1>✅ Tables Created Successfully!</h1>");
-  } catch (err) { res.status(500).send(err.message); }
-});
 
-app.get("/setup-test-data", async (req, res) => {
-  try {
-    await pool.query(`
-      INSERT INTO leave_quota (emp_id, sl_quota, pl_quota, cl_quota, year) 
-      VALUES (1, 5, 12, 8, 2026) 
-      ON CONFLICT (emp_id) DO UPDATE SET sl_quota = 5, pl_quota = 12, cl_quota = 8;
-    `);
-    res.send("✅ Test data created!");
-  } catch (err) { res.status(500).send(err.message); }
+    res.send("<h1>✅ Tables Created Successfully!</h1><p>Reviews and Tasks tables are now ready.</p>");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error creating tables: " + err.message);
+  }
 });
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server live on port ${PORT}`));
