@@ -90,7 +90,7 @@ const initDB = async () => {
       )
     `);
 
-    // 5. Performance Reviews Table (New Module)
+    // 5. Performance Reviews Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         review_id SERIAL PRIMARY KEY,
@@ -104,9 +104,35 @@ const initDB = async () => {
       )
     `);
 
+    // 6. Leave Quota Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS leave_quota (
+        id SERIAL PRIMARY KEY,
+        emp_id INT UNIQUE REFERENCES employees(emp_id) ON DELETE CASCADE,
+        sl_quota DECIMAL(5,2) DEFAULT 0,
+        pl_quota DECIMAL(5,2) DEFAULT 0,
+        cl_quota DECIMAL(5,2) DEFAULT 0,
+        year INT DEFAULT 2024
+      );
+    `);
+
+    // 7. Leave Requests Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS leaves (
+        leave_id SERIAL PRIMARY KEY,
+        emp_id INT REFERENCES employees(emp_id) ON DELETE CASCADE,
+        leave_type VARCHAR(10) CHECK (leave_type IN ('SL', 'PL', 'CL')),
+        reason TEXT NOT NULL,
+        from_date DATE NOT NULL,
+        to_date DATE NOT NULL,
+        status VARCHAR(20) DEFAULT 'Pending',
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS otp VARCHAR(6)`);
 
-    console.log("✅ All Tables Ready & Database Verified");
+    console.log("✅ All Tables Ready (Including Leave Management)");
   } catch (err) {
     console.error("❌ Init DB Error:", err);
   }
@@ -120,9 +146,68 @@ app.get("/", (req, res) => {
   res.send("🚀 HRM Backend Running Successfully");
 });
 
+/* ================= LEAVE MANAGEMENT APIs ================= */
+
+// Set or Update Leave Quota (For Admin/HR)
+app.post("/leaves/quota", async (req, res) => {
+  try {
+    const { emp_id, sl_quota, pl_quota, cl_quota } = req.body;
+    await pool.query(
+      `INSERT INTO leave_quota (emp_id, sl_quota, pl_quota, cl_quota)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (emp_id) DO UPDATE 
+       SET sl_quota = $2, pl_quota = $3, cl_quota = $4`,
+      [emp_id, sl_quota, pl_quota, cl_quota]
+    );
+    res.send("Quota Updated Successfully");
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+} );
+
+// Get balance and history for an employee
+app.get("/leaves/:empId", async (req, res) => {
+  try {
+    const quota = await pool.query("SELECT * FROM leave_quota WHERE emp_id = $1", [req.params.empId]);
+    const history = await pool.query("SELECT * FROM leaves WHERE emp_id = $1 ORDER BY applied_at DESC", [req.params.empId]);
+    res.json({ quota: quota.rows[0], history: history.rows });
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+});
+
+// Apply for leave
+app.post("/leaves/apply", async (req, res) => {
+  try {
+    const { emp_id, type, reason, from, to } = req.body;
+    await pool.query(
+      "INSERT INTO leaves (emp_id, leave_type, reason, from_date, to_date) VALUES ($1, $2, $3, $4, $5)",
+      [emp_id, type, reason, from, to]
+    );
+    res.json({ message: "Leave applied successfully" });
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+});
+
+// Admin: Update status and deduct from quota
+app.put("/leaves/status", async (req, res) => {
+  try {
+    const { leave_id, status, emp_id, leave_type, days } = req.body;
+    await pool.query("UPDATE leaves SET status = $1 WHERE leave_id = $2", [status, leave_id]);
+    
+    if (status === 'Approved') {
+      const quotaField = leave_type.toLowerCase() + '_quota';
+      await pool.query(`UPDATE leave_quota SET ${quotaField} = ${quotaField} - $1 WHERE emp_id = $2`, [days, emp_id]);
+    }
+    res.json({ message: "Status updated" });
+  } catch (err) {
+    res.status(500).json(err.message);
+  }
+});
+
 /* ================= PERFORMANCE REVIEW APIs ================= */
 
-// 1. Add a Performance Review
 app.post("/add-review", async (req, res) => {
   try {
     const { review_title, emp_id, review_date, review_period, rating, comment } = req.body;
@@ -133,12 +218,10 @@ app.post("/add-review", async (req, res) => {
     );
     res.send("Review Added Successfully");
   } catch (err) {
-    console.error(err);
     res.status(500).json(err.message);
   }
 });
 
-// 2. Get All Reviews (For Dashboard Table)
 app.get("/reviews", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -172,7 +255,6 @@ app.post("/add-task", async (req, res) => {
 
 app.get("/tasks", async (req, res) => {
   try {
-    // Modified to include Review data for the dashboard stats
     const result = await pool.query(`
       SELECT t.*, e.emp_name, r.review_period, r.rating
       FROM tasks t
@@ -196,7 +278,7 @@ app.delete("/delete-task/:id", async (req, res) => {
   }
 });
 
-/* ================= EMPLOYEES, ROLES, DEPT (Existing) ================= */
+/* ================= EMPLOYEES, ROLES, DEPT ================= */
 
 app.get("/employees", async (req, res) => {
   try {
