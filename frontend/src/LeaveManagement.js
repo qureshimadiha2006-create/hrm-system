@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 const LeaveManagement = () => {
-  // FIX: Removed the trailing slash at the end
+  // Removed trailing slash to prevent //leaves errors
   const API_BASE_URL = "https://hrm-system-madiha.onrender.com"; 
 
   const [view, setView] = useState("dashboard");
@@ -12,7 +12,7 @@ const LeaveManagement = () => {
   
   const [formData, setFormData] = useState({ type: "PL", reason: "", from: "", to: "" });
 
-  // Current logged-in user
+  // This email MUST exist in your database for the apply to work
   const currentEmpEmail = "madihaqureshimadiha2006@gmail.com"; 
 
   useEffect(() => {
@@ -35,31 +35,39 @@ const LeaveManagement = () => {
       const res = await axios.get(`${API_BASE_URL}/employees`);
       setEmployees(res.data || []);
     } catch (err) {
-      console.error("Could not load employees from backend:", err);
+      console.error("Could not load employees:", err);
     }
   };
 
+  // --- UPDATED APPLY LOGIC ---
   const handleApplyLeave = async (e) => {
     e.preventDefault();
     try {
+      // We send 'email' instead of 'emp_id' so the server can look it up
       await axios.post(`${API_BASE_URL}/leaves/apply`, { 
-        ...formData, 
-        email: currentEmpEmail 
+        email: currentEmpEmail,
+        type: formData.type,
+        reason: formData.reason,
+        from: formData.from,
+        to: formData.to
       });
-      alert("Leave Application Submitted!");
+      
+      alert("Leave Application Submitted Successfully!");
+      setFormData({ type: "PL", reason: "", from: "", to: "" }); // Reset form
       setView("dashboard");
-      fetchLeaveData();
+      fetchLeaveData(); // Refresh list
     } catch (err) {
-      alert("Submit failed. Make sure the backend is updated and running.");
+      console.error(err);
+      alert("Submit failed. Check console for details.");
     }
   };
 
   return (
     <div className="container mt-4 text-white">
       <div className="d-flex justify-content-end mb-4">
-        <button className={`btn btn-outline-info me-2 ${view === "dashboard" && "active"}`} onClick={() => setView("dashboard")}>Dashboard</button>
-        <button className={`btn btn-outline-warning me-2 ${view === "apply" && "active"}`} onClick={() => setView("apply")}>Apply Leave</button>
-        <button className={`btn btn-outline-danger ${view === "admin" && "active"}`} onClick={() => setView("admin")}>Admin Section</button>
+        <button className={`btn btn-sm mx-1 ${view === "dashboard" ? "btn-info" : "btn-outline-info"}`} onClick={() => setView("dashboard")}>Dashboard</button>
+        <button className={`btn btn-sm mx-1 ${view === "apply" ? "btn-warning" : "btn-outline-warning"}`} onClick={() => setView("apply")}>Apply Leave</button>
+        <button className={`btn btn-sm mx-1 ${view === "admin" ? "btn-danger" : "btn-outline-danger"}`} onClick={() => setView("admin")}>Admin Section</button>
       </div>
 
       {view === "dashboard" && (
@@ -74,7 +82,7 @@ const LeaveManagement = () => {
               <tr><th>Sr.No</th><th>Reason</th><th>Type</th><th>From</th><th>To</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {leaves.map((l, index) => (
+              {leaves.length > 0 ? leaves.map((l, index) => (
                 <tr key={index}>
                   <td>{index + 1}</td>
                   <td>{l.reason}</td>
@@ -83,7 +91,7 @@ const LeaveManagement = () => {
                   <td>{new Date(l.to_date).toLocaleDateString()}</td>
                   <td><span className="badge bg-warning">{l.status}</span></td>
                 </tr>
-              ))}
+              )) : <tr><td colSpan="6">No leave history found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -93,14 +101,14 @@ const LeaveManagement = () => {
         <div className="card bg-dark p-4 border-light mx-auto" style={{maxWidth: "500px"}}>
           <h4 className="mb-3">Apply Leave</h4>
           <form onSubmit={handleApplyLeave}>
-            <select className="form-select mb-3" onChange={(e) => setFormData({...formData, type: e.target.value})}>
+            <select className="form-select mb-3" value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})}>
               <option value="PL">Paid Leave (PL)</option>
               <option value="CL">Casual Leave (CL)</option>
               <option value="SL">Sick Leave (SL)</option>
             </select>
-            <textarea className="form-control mb-3" placeholder="Reason" required onChange={(e) => setFormData({...formData, reason: e.target.value})} />
-            <div className="mb-3 text-start"><label>From:</label><input type="date" className="form-control" required onChange={(e) => setFormData({...formData, from: e.target.value})} /></div>
-            <div className="mb-3 text-start"><label>To:</label><input type="date" className="form-control" required onChange={(e) => setFormData({...formData, to: e.target.value})} /></div>
+            <textarea className="form-control mb-3" placeholder="Reason" required value={formData.reason} onChange={(e) => setFormData({...formData, reason: e.target.value})} />
+            <div className="mb-3 text-start"><label>From:</label><input type="date" className="form-control" required value={formData.from} onChange={(e) => setFormData({...formData, from: e.target.value})} /></div>
+            <div className="mb-3 text-start"><label>To:</label><input type="date" className="form-control" required value={formData.to} onChange={(e) => setFormData({...formData, to: e.target.value})} /></div>
             <button type="submit" className="btn btn-primary w-100">Apply</button>
           </form>
         </div>
@@ -109,10 +117,9 @@ const LeaveManagement = () => {
       {view === "admin" && (
         <div className="card bg-dark p-4 border-info text-center">
           <h4>Admin Section</h4>
-          <p>This section is for managing all employee leaves.</p>
-          {/* Employee list will load here once API is live */}
+          <p>Select an employee to manage their quota.</p>
           <select className="form-select w-50 mx-auto">
-            <option>Select Employee to Update Quota</option>
+            <option>Select Employee</option>
             {employees.map((emp, i) => <option key={i} value={emp.email}>{emp.emp_name}</option>)}
           </select>
         </div>
