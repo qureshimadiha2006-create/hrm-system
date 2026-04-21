@@ -7,7 +7,14 @@ const { Pool } = require("pg");
 const nodemailer = require("nodemailer");
 
 const app = express();
-app.use(cors());
+
+// UPDATED CORS: Specifically allows your Vercel domain to talk to this server
+app.use(cors({
+  origin: ["https://hrm-system-eight.vercel.app", "http://localhost:3000"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 app.use(express.json());
 
 /* ================= DATABASE ================= */
@@ -148,7 +155,7 @@ app.get("/", (req, res) => {
 
 /* ================= LEAVE MANAGEMENT APIs ================= */
 
-// Set or Update Leave Quota (For Admin/HR)
+// Set or Update Leave Quota (Works with emp_id)
 app.post("/leaves/quota", async (req, res) => {
   try {
     const { emp_id, sl_quota, pl_quota, cl_quota } = req.body;
@@ -165,7 +172,7 @@ app.post("/leaves/quota", async (req, res) => {
   }
 } );
 
-// Get balance and history for an employee
+// Get balance and history using Employee ID
 app.get("/leaves/:empId", async (req, res) => {
   try {
     const quota = await pool.query("SELECT * FROM leave_quota WHERE emp_id = $1", [req.params.empId]);
