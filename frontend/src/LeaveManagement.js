@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 const LeaveManagement = () => {
+  // FIX: Removed the trailing slash at the end
   const API_BASE_URL = "https://hrm-system-madiha.onrender.com"; 
 
   const [view, setView] = useState("dashboard");
@@ -10,10 +11,9 @@ const LeaveManagement = () => {
   const [employees, setEmployees] = useState([]);
   
   const [formData, setFormData] = useState({ type: "PL", reason: "", from: "", to: "" });
-  const [quotaData, setQuotaData] = useState({ emp_email: "", pl: 0, cl: 0, sl: 0 });
 
-  // Using email as a unique identifier since your table shows emails clearly
-  const currentEmpEmail = "qureshimadiha2006@gmail.com"; 
+  // Current logged-in user
+  const currentEmpEmail = "madihaqureshimadiha2006@gmail.com"; 
 
   useEffect(() => {
     fetchLeaveData();
@@ -22,7 +22,6 @@ const LeaveManagement = () => {
 
   const fetchLeaveData = async () => {
     try {
-      // Fetching by email instead of ID to match your visible table data
       const res = await axios.get(`${API_BASE_URL}/leaves?email=${currentEmpEmail}`);
       setLeaves(res.data.history || []);
       if (res.data.quota) setQuota(res.data.quota);
@@ -41,18 +40,19 @@ const LeaveManagement = () => {
   };
 
   const handleApplyLeave = async (e) => {
-  e.preventDefault();
-  try {
-    const response = await axios.post(`${API_BASE_URL}/leaves/apply`, { ...formData, email: currentEmpEmail });
-    alert("Leave Application Submitted!");
-    setView("dashboard");
-    fetchLeaveData();
-  } catch (err) {
-    // This will tell you if it's a 404 (User not found), 500 (Server crash), or Network Error
-    console.error("Full Error:", err);
-    alert(`Error: ${err.response?.data || "Network error / Server offline"}`);
-  }
-};
+    e.preventDefault();
+    try {
+      await axios.post(`${API_BASE_URL}/leaves/apply`, { 
+        ...formData, 
+        email: currentEmpEmail 
+      });
+      alert("Leave Application Submitted!");
+      setView("dashboard");
+      fetchLeaveData();
+    } catch (err) {
+      alert("Submit failed. Make sure the backend is updated and running.");
+    }
+  };
 
   return (
     <div className="container mt-4 text-white">
@@ -64,25 +64,24 @@ const LeaveManagement = () => {
 
       {view === "dashboard" && (
         <div>
-           {/* Leave Balance Cards [cite: 188, 190, 191] */}
           <div className="row mb-4">
-            <div className="col-md-4"><div className="card bg-danger p-3 text-center"><h5>PL</h5><h3>{quota.pl_quota}</h3></div></div>
-            <div className="col-md-4"><div className="card bg-success p-3 text-center"><h5>CL</h5><h3>{quota.cl_quota}</h3></div></div>
-            <div className="col-md-4"><div className="card bg-warning p-3 text-center text-dark"><h5>SL</h5><h3>{quota.sl_quota}</h3></div></div>
+            <div className="col-md-4"><div className="card bg-danger p-3 text-center"><h5>PL</h5><h3>{quota.pl_quota || 0}</h3></div></div>
+            <div className="col-md-4"><div className="card bg-success p-3 text-center"><h5>CL</h5><h3>{quota.cl_quota || 0}</h3></div></div>
+            <div className="col-md-4"><div className="card bg-warning p-3 text-center text-dark"><h5>SL</h5><h3>{quota.sl_quota || 0}</h3></div></div>
           </div>
           <table className="table table-dark table-striped mt-4">
             <thead>
-              <tr><th>Sr.No</th><th>Leave Reason</th><th>Leave Type</th><th>From</th><th>To</th><th>Status</th></tr>
+              <tr><th>Sr.No</th><th>Reason</th><th>Type</th><th>From</th><th>To</th><th>Status</th></tr>
             </thead>
             <tbody>
               {leaves.map((l, index) => (
                 <tr key={index}>
                   <td>{index + 1}</td>
                   <td>{l.reason}</td>
-                  <td>{l.type}</td>
-                  <td>{l.from}</td>
-                  <td>{l.to}</td>
-                  <td><span className="badge bg-warning">{l.status || "Pending"}</span></td>
+                  <td>{l.leave_type}</td>
+                  <td>{new Date(l.from_date).toLocaleDateString()}</td>
+                  <td>{new Date(l.to_date).toLocaleDateString()}</td>
+                  <td><span className="badge bg-warning">{l.status}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -99,7 +98,7 @@ const LeaveManagement = () => {
               <option value="CL">Casual Leave (CL)</option>
               <option value="SL">Sick Leave (SL)</option>
             </select>
-            <textarea className="form-control mb-3" placeholder="Reason of Leave" required onChange={(e) => setFormData({...formData, reason: e.target.value})} />
+            <textarea className="form-control mb-3" placeholder="Reason" required onChange={(e) => setFormData({...formData, reason: e.target.value})} />
             <div className="mb-3 text-start"><label>From:</label><input type="date" className="form-control" required onChange={(e) => setFormData({...formData, from: e.target.value})} /></div>
             <div className="mb-3 text-start"><label>To:</label><input type="date" className="form-control" required onChange={(e) => setFormData({...formData, to: e.target.value})} /></div>
             <button type="submit" className="btn btn-primary w-100">Apply</button>
@@ -108,21 +107,14 @@ const LeaveManagement = () => {
       )}
 
       {view === "admin" && (
-        <div className="card bg-dark p-4 border-info">
-          <div className="row g-2">
-            <div className="col-md-3">
-              <select className="form-select" onChange={(e) => setQuotaData({...quotaData, emp_email: e.target.value})}>
-                <option value="">Select Employee</option>
-                {employees.map((emp, i) => (
-                  <option key={i} value={emp.email}>{emp.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-2"><input type="number" placeholder="PL" className="form-control" onChange={(e) => setQuotaData({...quotaData, pl: e.target.value})} /></div>
-            <div className="col-md-2"><input type="number" placeholder="CL" className="form-control" onChange={(e) => setQuotaData({...quotaData, cl: e.target.value})} /></div>
-            <div className="col-md-2"><input type="number" placeholder="SL" className="form-control" onChange={(e) => setQuotaData({...quotaData, sl: e.target.value})} /></div>
-            <div className="col-md-3"><button className="btn btn-info w-100">Update Quota</button></div>
-          </div>
+        <div className="card bg-dark p-4 border-info text-center">
+          <h4>Admin Section</h4>
+          <p>This section is for managing all employee leaves.</p>
+          {/* Employee list will load here once API is live */}
+          <select className="form-select w-50 mx-auto">
+            <option>Select Employee to Update Quota</option>
+            {employees.map((emp, i) => <option key={i} value={emp.email}>{emp.emp_name}</option>)}
+          </select>
         </div>
       )}
     </div>
