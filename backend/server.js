@@ -132,6 +132,33 @@ app.post("/leaves/apply", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
+/* ... your existing routes like /employees, /leaves etc ... */
+
+// --- PASTE THE TEMPORARY ROUTE HERE ---
+app.get("/setup-test-data", async (req, res) => {
+  try {
+    // 1. Give Employee ID 1 some quota
+    await pool.query(`
+      INSERT INTO leave_quota (emp_id, sl_quota, pl_quota, cl_quota, year) 
+      VALUES (1, 5, 12, 8, 2026) 
+      ON CONFLICT (emp_id) DO UPDATE SET sl_quota = 5, pl_quota = 12, cl_quota = 8;
+    `);
+    
+    // 2. Add a sample leave history entry
+    await pool.query(`
+      INSERT INTO leaves (emp_id, leave_type, reason, from_date, to_date, status) 
+      VALUES (1, 'PL', 'Reference Leave Entry', '2026-05-10', '2026-05-12', 'Approved');
+    `);
+    
+    res.send("✅ Test data created for ID 1! You can now delete this route.");
+  } catch (err) {
+    res.status(500).send("Error creating data: " + err.message);
+  }
+});
+
+// --- THIS IS ALWAYS AT THE VERY BOTTOM ---
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server live on port ${PORT}`));
 
 /* ================= 5. SERVER START ================= */
 const PORT = process.env.PORT || 5000;
